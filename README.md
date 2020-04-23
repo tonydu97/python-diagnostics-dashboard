@@ -1,2 +1,2 @@
 # python-dashboard
-Web dashboard using Dash and Plotly 
+M&A Diagnostics dashboard using Dash and Plotly 
