@@ -7,7 +7,7 @@ import dash_table
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_bootstrap_components as dbc
-
+from dash.dependencies import Input, Output, State
 
 import pandas as pd
 import numpy as np
@@ -15,10 +15,17 @@ import numpy as np
 
 # global vars
 raw_results_dir = 'C:/Users/tdu/python/Raw results/'
+lst_runs = [d for d in os.listdir(raw_results_dir) if os.path.isdir(os.path.join(raw_results_dir, d))]
+lst_runs.sort(reverse = True)
 lst_baa = ['FG', 'DUK', 'ALGAMS']
 lst_utilities = ['NextEra Energy Inc', 'Southern Co']
+lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.YETI])
+
+
+
+
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server  # for Heroku deployment
 
 
@@ -49,17 +56,20 @@ LEFT_COLUMN = dbc.Jumbotron(
         html.Hr(className='my-2'),
         html.Label('Select raw results folder', className='lead'),
         dcc.Dropdown(
-            id='raw-drop', clearable=False, style = {'marginBottom': 10}
+            id='raw-drop', clearable=False, style = {'marginBottom': 10},
+            options=[{'label':i, 'value':i} for i in lst_runs]
         ),
-        dbc.Button('Import', id = 'raw-btn', color = 'primary', className = 'mr-1', n_clicks=0),
+        dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
         html.Div(style = {'marginBottom':50}),
+
         html.Label('Select BAA', className='lead'),
         dcc.Dropdown(
             id ='baa-drop', clearable = False, style={'marginBottom': 50}, disabled = True
         ),
         html.Label('Select Period', className='lead'),
         dcc.Dropdown(
-            id ='period-drop', clearable = False, style={'marginBottom': 50}, disabled = True
+            id ='period-drop', clearable = False, style={'marginBottom': 50}, disabled = True,
+            options = [{'label':i, 'value':i} for i in lst_periods]
         ),
         html.Label('Select Utility(s)', className = 'lead'),
         dcc.Dropdown(
@@ -71,8 +81,8 @@ LEFT_COLUMN = dbc.Jumbotron(
 
 
 #unused tab example
-TAB_EXAMPLE = [
-    dbc.CardHeader(html.H5('Most frequently used words in complaints')),
+MMSUMMARY_PLOT = [
+    dbc.CardHeader(html.H5('Mmfile Summary')),
     dbc.CardBody(
         [
             dbc.Row(
@@ -83,31 +93,38 @@ TAB_EXAMPLE = [
                                 id='tabs',
                                 children=[
                                     dcc.Tab(
-                                        label='Supply Curve',
+                                        label='Generation',
                                         children=[
                                             dcc.Loading(
-                                                id='loading-treemap',
-                                                children=[dcc.Graph(id='bank-treemap')],
+                                                id='loading-gen',
+                                                children=[dcc.Graph(id='gen-graph')],
                                                 type='default',
                                             )
                                         ],
                                     ),
                                     dcc.Tab(
-                                        label='Top Players',
+                                        label='Load',
                                         children=[
                                             dcc.Loading(
-                                                id='loading-wordcloud',
-                                                children=[
-                                                    dcc.Graph(id='bank-wordcloud')
-                                                ],
+                                                id='loading-load',
+                                                children=[dcc.Graph(id='load-graph')],
                                                 type='default',
+                                            )
+                                        ],
+                                    ),
+                                    dcc.Tab(
+                                        label='Transmission',
+                                        children=[
+                                            dcc.Loading(
+                                                id = 'loading-transmission',
+                                                children = [dcc.Graph(id = 'transmission-graph')]
                                             )
                                         ],
                                     ),
                                 ],
                             )
                         ],
-                        md=8,
+                        #md=12,
                     ),
                 ]
             )
@@ -129,35 +146,13 @@ TOP_PLOT = [
     )
 ]
 
-PHASE_PLOT = [
-    dbc.CardHeader(html.H3('Phase3X4X By DM By Period')),
-    dbc.CardBody(
-        [
-            dcc.Loading(
-                id='loading-banks-hist',
-                children=[
-                    dbc.Alert(
-                        'Not enough data to render this plot, please adjust the filters',
-                        id='no-data-alert-bank',
-                        color='warning',
-                        style={'display': 'none'},
-                    ),
-                    dcc.Graph(id='bank-sample'),
-                ],
-                type='default',
-            )
-        ],
-        style={'marginTop': 0, 'marginBottom': 0},
-    ),
-]
-
 
 BODY = dbc.Container(
     [
         dbc.Row(
             [
                 dbc.Col(LEFT_COLUMN, md=4, align='center'),
-                dbc.Col(dbc.Card(PHASE_PLOT), md=8),
+                dbc.Col(dbc.Card(MMSUMMARY_PLOT), md=8),
             ],
             style={'marginTop': 30},
         ),
@@ -170,6 +165,29 @@ BODY = dbc.Container(
     ],
     className='mt-12', fluid = True
 )
+
+
+@app.callback(
+    Output('import-btn', 'disabled'),
+    [Input('raw-drop', 'value')]
+)
+def enable_submitbtn(value):
+    if value != None:
+        return False
+    else:
+        return True
+
+@app.callback(
+    [Output('baa-drop', 'disabled'),
+    Output('period-drop', 'disabled'),
+    Output('utility-drop', 'disabled'),],
+    [Input('import-btn', 'n_clicks')])
+
+def enable_dropdowns(n_clicks):
+    if n_clicks == 0:
+        return True, True, True
+    else:
+        return False, False, False
 
 
 
