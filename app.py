@@ -223,7 +223,7 @@ BODY = dbc.Container(
         dbc.Row(
             [
                 dbc.Col(LEFT_COLUMN, md=3, align='center'),
-                dbc.Col(dbc.Card(MMSUMMARY_PLOT)),
+                dbc.Col(dbc.Card(MMSUMMARY_PLOT), md=9),
             ],
             style={'marginTop': 30},
         ),
@@ -386,14 +386,14 @@ def update_phase_graph(baa, period, utility, jsonfile):
         raise PreventUpdate
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['phase'], orient='split')
-    df_filter = df[(df['CA'] == baa) & (df['Period'] == period) & (df['Utility'] == utility)]
+    df_filter = df[(df['DM'] == baa) & (df['Period'] == period) & (df['Utility'] == utility)]
     fig = go.Figure(data=[
         go.Bar(name='3X Gen', x=df_filter['CA'] , y=df_filter['3X']),
         go.Bar(name='4X Gen', x=df_filter['CA'] , y=df_filter['4X'])
     ])
     fig.update_layout(barmode='group')
     return fig
-
+app.title = 'Diagnostics Dashboard'
 app.layout = html.Div(children=[NAVBAR, BODY])
 if __name__ == '__main__':
     app.run_server(host='127.0.0.1', port='8050', debug=True)

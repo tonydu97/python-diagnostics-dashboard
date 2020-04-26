@@ -1,10 +1,11 @@
 '''
-4/25/20
-Tony Du
 
 Diagnostics for M&A DPT Analysis
 Processes raw results 
 Creates input xlsx file to be used for dashboard visualization and analysis
+
+Tony Du
+Last updated 4/26/20
 
 
 '''
@@ -37,15 +38,15 @@ def mm_summary():
 
     df_BAA = df_map_mm['CA']
     df_BAA = df_BAA.drop(columns=['CA']).dropna()
-    df_mcp = df_map_mm['mcp']
-    df_loads = df_map_mm['loads']
-    df_loss = df_map_mm['loss']
+    df_mcp = df_map_mm['mcp'].round(2)
+    df_loads = df_map_mm['loads'].round(0)
+    df_loss = df_map_mm['loss'].round(3)
 
     df_gen_cap = df_map_mm['unit_tcap']
     df_gen_avl = df_map_mm['unit_avail']
     df_tx_cap = df_map_mm['line_cap']
     df_tx_avl = df_map_mm['line_avail']
-    df_wheel = df_map_mm['line_wheel']
+    df_wheel = df_map_mm['line_wheel'].round(2)
 
     # shorten column names and make them consistent
     df_mcp.rename(columns={'DM': 'CA','CP': 'MCP'}, inplace=True)
@@ -60,6 +61,7 @@ def mm_summary():
     df_gen_out['gen_MW'] = df_gen_out['Cap_MW'] * df_gen_out['Avl_MW']
 
     df_gen_out = df_gen_out.groupby(['CA', 'UTILITY', 'PERIOD'])['gen_MW'].sum().reset_index().round(0)
+    df_gen_out = df_gen_out[df_gen_out['gen_MW'] > 0]
 
     # transmission 
     df_tx_out = df_tx_avl.set_index(['From_CA', 'To_CA'])
@@ -83,7 +85,7 @@ def mm_summary():
 
 def phase():
     df_4x = pd.read_csv(file_4x, delimiter = ',', encoding = 'latin-1')
-    df_4x = df_4x[df_4x['Unit'] != 'DummyGen']
+    df_4x = df_4x[(df_4x['Unit'] != 'DummyGen')]
     df_4x.rename(columns = {'Gen' : '4X'}, inplace = True)
 
     df_3x = pd.read_csv(file_3x, delimiter = ',', encoding = 'latin-1')
@@ -91,11 +93,12 @@ def phase():
     df_3x.rename(columns = {'Gen' : '3X'}, inplace = True)
 
 
-    df_group_4x = df_4x.groupby(['Utility', 'CA', 'Period'])[['4X']].sum()
-    df_group_3x = df_3x.groupby(['Utility', 'CA', 'Period'])[['3X']].sum()
+    df_group_4x = df_4x.groupby(['Utility', 'DM', 'CA', 'Period'])[['4X']].sum().round(0)
+    df_group_3x = df_3x.groupby(['Utility', 'DM', 'CA', 'Period'])[['3X']].sum().round(0)
 
 
     df_out = pd.concat([df_group_3x, df_group_4x], axis=1).reset_index()
+    df_out = df_out[(df_out['3X'] > 0) & (df_out['4X'] > 0) ]
 
     df_out.to_excel(writer, index=False, sheet_name='phase')
         
@@ -108,6 +111,9 @@ def top_players():
     # export to excel
     df_hhi.rename(columns={'MW_with_LSF': 'MW', 'Share_with_LSF(%)':'Share', 'HHI_with_LSF' : 'HHI' }, inplace=True)
     df_hhi = df_hhi[['Period', 'DM', 'Utility', 'MW', 'Share', 'HHI']]
+    df_hhi = df_hhi[df_hhi['HHI'] != 0]
+    df_hhi['MW'] = df_hhi['MW'].round(0)
+    df_hhi['HHI'] = df_hhi['MW'].round(0)
     df_hhi.to_excel(writer, index=False, sheet_name='hhi')
     print('top players complete')
 
@@ -116,6 +122,8 @@ def supply_curve():
     df_supply = pd.read_excel(file_x, sheet_name='DPT_supply_curve')
     df_supply.rename(columns={'Prime mover' : 'Type', 'Marginal cost' : 'MC', 'Capacity (MW)' :'Capacity'}, inplace=True)
     df_supply = df_supply[['Period', 'BAA', 'Generator', 'Owner', 'Type', 'MC', 'Capacity']]
+    df_supply['MC'] = df_supply['MC'].round(2)
+    df_supply['Capacity'] = df_supply['Capacity'].round(0)
     df_supply.to_excel(writer, index=False, sheet_name='supply')
     print('supply curve complete')
 
