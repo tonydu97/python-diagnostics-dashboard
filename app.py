@@ -34,7 +34,7 @@ lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', '
 
 
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.YETI])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
 server = app.server  # for Heroku deployment
 
 
@@ -46,7 +46,7 @@ NAVBAR = dbc.Navbar(
                 [
                     dbc.Col(html.Img(src=app.get_asset_url('cra-logo.png'), height='30px')),
                     dbc.Col(
-                        dbc.NavbarBrand('DPT Diagnostics Dashboard Beta', className='ml-2')
+                        dbc.NavbarBrand('DPT Diagnostics Dashboard - Beta', className='ml-2')
                     ),
                 ],
                 align='center',
@@ -99,14 +99,14 @@ MMSUMMARY_PLOT = [
                     dbc.Col(
                         [
                             dcc.Tabs(
-                                id='tabs',
+                                id='top-tabs',
                                 children=[
                                     dcc.Tab(
                                         label='Generation',
                                         children=[
                                             dcc.Loading(
                                                 id='loading-gen',
-                                                children=[dcc.Graph(id='gen-graph')],
+                                                children=[dcc.Graph(id='gen-graph')], #graph fixed size set in callback function on figure
                                                 type='default',
                                             )
                                         ],
@@ -125,8 +125,9 @@ MMSUMMARY_PLOT = [
                                         label='Transmission',
                                         children=[
                                             dcc.Loading(
-                                                id = 'loading-transmission',
-                                                children = [dcc.Graph(id = 'tx-graph')]
+                                                id ='loading-transmission',
+                                                children = [dcc.Graph(id='tx-graph')],
+                                                type = 'default',
                                             )
                                         ],
                                     ),
@@ -141,18 +142,56 @@ MMSUMMARY_PLOT = [
     ),
 ]
 
-SC_PLOT = [
-    dbc.CardHeader(html.H3('Supply Curve')),
-    dbc.CardBody(
-        dcc.Graph(id = 'supply-graph')
-    )
-]
 
-TOP_PLOT = [
-    dbc.CardHeader(html.H3('Top Players')),
+BOTTOM_PLOTS = [
+    dbc.CardHeader(html.H5('Additional Diagnostics')),
     dbc.CardBody(
-        dcc.Graph(id = 'topplayers-graph')
-    )
+        [
+            dbc.Row(
+                [
+                    dbc.Col(
+                        [
+                            dcc.Tabs(
+                                id='bottom-tabs',
+                                children=[
+                                    dcc.Tab(
+                                        label='Top Players',
+                                        children=[
+                                            dcc.Loading(
+                                                id='loading-hhi',
+                                                children=[dcc.Graph(id='hhi-graph')], 
+                                                type='default',
+                                            )
+                                        ],
+                                    ),
+                                    dcc.Tab(
+                                        label='Supply Curve',
+                                        children=[
+                                            dcc.Loading(
+                                                id='loading-supply',
+                                                children=[dcc.Graph(id='supply-graph')],
+                                                type='default',
+                                            )
+                                        ],
+                                    ),
+                                    dcc.Tab(
+                                        label='Phase3X4X',
+                                        children=[
+                                            dcc.Loading(
+                                                id ='loading-phase',
+                                                children = [dcc.Graph(id='phase-graph')],
+                                                type = 'default',
+                                            )
+                                        ],
+                                    ),
+                                ],
+                            )
+                        ],
+                    ),
+                ]
+            )
+        ]
+    ),
 ]
 
 
@@ -167,9 +206,9 @@ BODY = dbc.Container(
         ),
         dbc.Row(
             [
-                dbc.Col(dbc.Card(SC_PLOT), md = 6),
-                dbc.Col(dbc.Card(TOP_PLOT), md = 6)
+                dbc.Col(dbc.Card(BOTTOM_PLOTS))
             ],
+            style={'marginTop': 30},
         ),
         html.Div(id = 'store-df', style = {'display' : 'none'})
     ],
@@ -245,6 +284,7 @@ def update_gen_graph(baa, period, jsonfile):
     df = pd.read_json(dict_df['gen'], orient='split')
     df_filter = df[df['CA'] == baa][df['PERIOD'] == period].sort_values(by='gen_MW', ascending=True)
     fig = px.bar(df_filter, y='UTILITY', x='gen_MW', orientation = 'h')
+    fig.update_layout(height=450)
     return fig
 
 @app.callback(
@@ -259,6 +299,7 @@ def update_load_graph(baa, period, jsonfile):
     df = pd.read_json(dict_df['loads'], orient='split')
     df_filter = df[df['CA'] == baa][df['PERIOD'] == period].sort_values(by='LOAD', ascending=True)
     fig = px.bar(df_filter, y='UTILITY', x='LOAD', orientation = 'h')
+    fig.update_layout(height=450)
     return fig
 
 @app.callback(

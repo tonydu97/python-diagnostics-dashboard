@@ -71,24 +71,58 @@ def mm_summary():
     df_wheel_out = df_wheel.drop(['From_CA'], axis=1).groupby(['To_CA', 'Period']).mean().reset_index()
 
     # export to excel
-    # df_BAA.to_excel(writer, index=False, sheet_name ='baa')
-    # df_mcp.to_excel(writer, index=False, sheet_name='mcp')
-    # df_loads.to_excel(writer, index=False, sheet_name='loads')
-    # df_loss.to_excel(writer, index=False, sheet_name='lineloss')
-    # df_gen_out.to_excel(writer, index=False, sheet_name='gen')
-    # df_tx_out.to_excel(writer, index=False, sheet_name='tx')
-    # df_wheel_out.to_excel(writer, index=False, sheet_name='wheel')
+    df_BAA.to_excel(writer, index=False, sheet_name ='baa')
+    df_mcp.to_excel(writer, index=False, sheet_name='mcp')
+    df_loads.to_excel(writer, index=False, sheet_name='loads')
+    df_loss.to_excel(writer, index=False, sheet_name='lineloss')
+    df_gen_out.to_excel(writer, index=False, sheet_name='gen')
+    df_tx_out.to_excel(writer, index=False, sheet_name='tx')
+    df_wheel_out.to_excel(writer, index=False, sheet_name='wheel')
 
     print('mm summary complete')
 
 def phase():
-    pass
+    df_4x = pd.read_csv(file_4x, delimiter = ',', encoding = 'latin-1')
+    df_4x = df_4x[df_4x['Unit'] != 'DummyGen']
+    df_4x.rename(columns = {'Gen' : '4X'}, inplace = True)
+
+    df_3x = pd.read_csv(file_3x, delimiter = ',', encoding = 'latin-1')
+    df_3x = df_3x[(df_3x['Unit'] != 'DummyGen') & (df_3x['Round'] == 1)]
+    df_3x.rename(columns = {'Gen' : '3X'}, inplace = True)
+
+
+    df_group_4x = df_4x.groupby(['Utility', 'CA', 'Period'])[['4X']].sum()
+    df_group_3x = df_3x.groupby(['Utility', 'CA', 'Period'])[['3X']].sum()
+
+
+    df_out = pd.concat([df_group_3x, df_group_4x], axis=1).reset_index()
+
+    df_out.to_excel(writer, index=False, sheet_name='phase')
+        
+    print ('phase3x4x complete')
 
 def top_players():
-    pass
+    df_hhi = pd.read_csv(file_hhi, encoding='ISO-8859-1')
+    df_hhi = df_hhi[df_hhi['Measure'] == 'AEC']
+
+    # export to excel
+    df_hhi.rename(columns={'MW_with_LSF': 'MW', 'Share_with_LSF(%)':'Share', 'HHI_with_LSF' : 'HHI' }, inplace=True)
+    df_hhi = df_hhi[['Period', 'DM', 'Utility', 'MW', 'Share', 'HHI']]
+    df_hhi.to_excel(writer, index=False, sheet_name='hhi')
+    print('top players complete')
+
 
 def supply_curve():
-    pass
+    df_supply = pd.read_excel(file_x, sheet_name='DPT_supply_curve')
+    df_supply.rename(columns={'Prime mover' : 'Type', 'Marginal cost' : 'MC', 'Capacity (MW)' :'Capacity'}, inplace=True)
+    df_supply = df_supply[['Period', 'BAA', 'Generator', 'Owner', 'Type', 'MC', 'Capacity']]
+    df_supply.to_excel(writer, index=False, sheet_name='supply')
+    print('supply curve complete')
 
 mm_summary()
+top_players()
+supply_curve()
+phase()
+print('Saving to excel')
 writer.save()
+print('Done')
