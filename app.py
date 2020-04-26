@@ -9,13 +9,23 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
 
 import pandas as pd
 import numpy as np
+import json
+import plotly.graph_objects as go
+import plotly.express as px
+
+
 
 
 # global vars
-dir_diagnostics = 'C:/Users/tdu/python/python-diagnostics-dashboard/diagnostics/'
+dir_absolute = 'C:/Users/tdu/python/python-diagnostics-dashboard/diagnostics/'
+dirname = os.path.dirname(__file__)
+path_d = os.path.join(dirname, 'diagnostics/')
+#lst_rel = [f for f in os.listdir(relative_path) if f.endswith('.xlsx')]
+#lst_rel = os.listdir(relative_path)
 lst_baa = ['FG', 'DUK', 'ALGAMS']
 lst_utilities = ['NextEra Energy Inc', 'Southern Co']
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
@@ -36,7 +46,7 @@ NAVBAR = dbc.Navbar(
                 [
                     dbc.Col(html.Img(src=app.get_asset_url('cra-logo.png'), height='30px')),
                     dbc.Col(
-                        dbc.NavbarBrand('Apollo 11 - Diagnostics Dashboard', className='ml-2')
+                        dbc.NavbarBrand('DPT Diagnostics Dashboard Beta', className='ml-2')
                     ),
                 ],
                 align='center',
@@ -51,32 +61,33 @@ NAVBAR = dbc.Navbar(
 
 LEFT_COLUMN = dbc.Jumbotron(
     [
-        html.H4(children='Inputs', className='display-5', style = {'fontSize': 36}),
-        html.Hr(className='my-2'),
-        html.Label('Select raw results folder', className='lead'),
-        dcc.Dropdown(
-            id='raw-drop', clearable=False, style = {'marginBottom': 10},
-            options=[{'label':i, 'value':i} for i in os.listdir(dir_diagnostics)]
-        ),
-        dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
-        html.Div(style = {'marginBottom':50}),
+        dbc.Container(
+            [
+                html.H4(children='Inputs', className='display-5', style = {'fontSize': 36}),
+                html.Hr(className='my-2'),
+                html.Label('Select diagnostics file', className='lead'),
+                dcc.Dropdown(
+                    id='file-drop', clearable=False, style = {'marginBottom': 10, 'fontSize': 14},
+                    #options=[{'label':i, 'value':i} for i in os.listdir(dir_diagnostics)]
+                    options=[{'label':i, 'value':i} for i in [f for f in os.listdir(path_d) if f.endswith('.xlsx')]]
+                ),
+                dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
+                html.Div(style = {'marginBottom':25}),
 
-        html.Label('Select BAA', className='lead'),
-        dcc.Dropdown(
-            id ='baa-drop', clearable = False, style={'marginBottom': 50}, disabled = True
-        ),
-        html.Label('Select Period', className='lead'),
-        dcc.Dropdown(
-            id ='period-drop', clearable = False, style={'marginBottom': 50}, disabled = True,
-            options = [{'label':i, 'value':i} for i in lst_periods]
-        ),
-        html.Label('Select Utility(s)', className = 'lead'),
-        dcc.Dropdown(
-            id = 'utility-drop', multi = True, disabled = True
-        ),
-    ], 
-    #style = {'backgroundColor':'#add8e6'}
+                html.Label('Select BAA', className='lead'),
+                dcc.Dropdown(
+                    id ='baa-drop', clearable = False, style={'marginBottom': 25}, disabled = True
+                ),
+                html.Label('Select Period', className='lead'),
+                dcc.Dropdown(
+                    id ='period-drop', clearable = False, style={'marginBottom': 0}, disabled = True,
+                    options = [{'label':i, 'value':i} for i in lst_periods]
+                )
+            ], fluid = True
+        )
+    ],fluid = True
 )
+
 
 
 MMSUMMARY_PLOT = [
@@ -115,7 +126,7 @@ MMSUMMARY_PLOT = [
                                         children=[
                                             dcc.Loading(
                                                 id = 'loading-transmission',
-                                                children = [dcc.Graph(id = 'transmission-graph')]
+                                                children = [dcc.Graph(id = 'tx-graph')]
                                             )
                                         ],
                                     ),
@@ -149,8 +160,8 @@ BODY = dbc.Container(
     [
         dbc.Row(
             [
-                dbc.Col(LEFT_COLUMN, md=4, align='center'),
-                dbc.Col(dbc.Card(MMSUMMARY_PLOT), md=8),
+                dbc.Col(LEFT_COLUMN, md=2, align='center'),
+                dbc.Col(dbc.Card(MMSUMMARY_PLOT), md=10),
             ],
             style={'marginTop': 30},
         ),
@@ -159,7 +170,8 @@ BODY = dbc.Container(
                 dbc.Col(dbc.Card(SC_PLOT), md = 6),
                 dbc.Col(dbc.Card(TOP_PLOT), md = 6)
             ],
-        )
+        ),
+        html.Div(id = 'store-df', style = {'display' : 'none'})
     ],
     className='mt-12', fluid = True
 )
@@ -167,27 +179,102 @@ BODY = dbc.Container(
 
 @app.callback(
     Output('import-btn', 'disabled'),
-    [Input('raw-drop', 'value')]
+    [Input('file-drop', 'value')]
 )
 def enable_submitbtn(value):
     if value != None:
         return False
     else:
-        return True
+        raise PreventUpdate
 
 @app.callback(
     [Output('baa-drop', 'disabled'),
-    Output('period-drop', 'disabled'),
-    Output('utility-drop', 'disabled'),],
-    [Input('import-btn', 'n_clicks')])
+    Output('period-drop', 'disabled')],
+    [Input('import-btn', 'n_clicks')]
+)
 
 def enable_dropdowns(n_clicks):
     if n_clicks == 0:
-        return True, True, True
+        raise PreventUpdate
     else:
-        return False, False, False
+        return False, False
 
+@app.callback(
+    Output('store-df', 'children'),
+    [Input('import-btn', 'n_clicks')],
+    [State('file-drop', 'value')]
+)
 
+def load_df(n_clicks, file):
+    if n_clicks == 0:
+        raise PreventUpdate
+    else:
+        dict_df = pd.read_excel(path_d + file, sheet_name=None)
+        dict_out = {}
+        for key in dict_df:
+            dict_out[key] = dict_df[key].to_json(orient='split')
+        return json.dumps(dict_out)
+ 
+
+@app.callback(
+    [Output('baa-drop', 'options'),
+    Output('period-drop', 'options'),
+    Output('baa-drop', 'value'),
+    Output('period-drop', 'value')],
+    [Input('store-df', 'children')]
+)
+
+def populate_dropdowns(jsonfile):
+    if jsonfile == None:
+        raise PreventUpdate
+    else:
+        dict_df = json.loads(jsonfile)
+        df_baa = pd.read_json(dict_df['baa'], orient='split')
+        lst_baa = df_baa['DM'].tolist()
+        return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], lst_baa[0], lst_periods[0]
+
+@app.callback(
+    Output('gen-graph', 'figure'),
+    [Input('baa-drop', 'value'),
+    Input('period-drop', 'value')],
+    [State('store-df', 'children')] 
+)    
+
+def update_gen_graph(baa, period, jsonfile):
+    dict_df = json.loads(jsonfile)
+    df = pd.read_json(dict_df['gen'], orient='split')
+    df_filter = df[df['CA'] == baa][df['PERIOD'] == period].sort_values(by='gen_MW', ascending=True)
+    fig = px.bar(df_filter, y='UTILITY', x='gen_MW', orientation = 'h')
+    return fig
+
+@app.callback(
+    Output('load-graph', 'figure'),
+    [Input('baa-drop', 'value'),
+    Input('period-drop', 'value')],
+    [State('store-df', 'children')] 
+)    
+
+def update_load_graph(baa, period, jsonfile):
+    dict_df = json.loads(jsonfile)
+    df = pd.read_json(dict_df['loads'], orient='split')
+    df_filter = df[df['CA'] == baa][df['PERIOD'] == period].sort_values(by='LOAD', ascending=True)
+    fig = px.bar(df_filter, y='UTILITY', x='LOAD', orientation = 'h')
+    return fig
+
+@app.callback(
+    Output('tx-graph', 'figure'),
+    [Input('baa-drop', 'value'),
+    Input('period-drop', 'value')],
+    [State('store-df', 'children')] 
+)    
+
+def update_tx_graph(baa, period, jsonfile):
+    dict_df = json.loads(jsonfile)
+    df = pd.read_json(dict_df['tx'], orient='split')
+    df_filter = df[(df['To_CA'] == baa) | (df['From_CA'] == baa)][df['PERIOD'] == period].sort_values(by='To_CA', ascending=True)
+    fig = px.bar(df_filter, y='To_CA', x='tx_line_MW', color='To_CA' , orientation = 'h')
+    return fig
+    #TODO make this into three column df based on selected baa: CA, TO(MW), FROM(MW)
 
 app.layout = html.Div(children=[NAVBAR, BODY])
 if __name__ == '__main__':

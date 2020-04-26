@@ -15,6 +15,8 @@ import os
 
 folder = 'C:/Users/tdu/python/Raw results/' 
 case = 'jli_v21_FG_5SILs_pjm_origMCP_pre_plus'
+
+# TODO use __file__
 inputfolder = folder + case + '/'
 output = 'diagnostics/diagnostics_'+ case + '.xlsx'
 
@@ -33,8 +35,9 @@ def mm_summary():
     df_map_mm = pd.read_excel(file_mm, sheet_name=None)
     df_map_mm.keys()
 
-    # no changes
+
     df_BAA = df_map_mm['CA']
+    df_BAA = df_BAA.drop(columns=['CA']).dropna()
     df_mcp = df_map_mm['mcp']
     df_loads = df_map_mm['loads']
     df_loss = df_map_mm['loss']
