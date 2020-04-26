@@ -332,7 +332,25 @@ def update_tx_graph(baa, period, jsonfile):
     ])
     fig.update_layout(barmode='group')
     return fig
-    #TODO make this into three column df based on selected baa: CA, TO(MW), FROM(MW)
+
+
+@app.callback(
+    Output('hhi-graph', 'figure'),
+    [Input('baa-drop', 'value'),
+    Input('period-drop', 'value')],
+    [State('store-df', 'children')]
+)
+
+def update_hhi_graph(baa, period, jsonfile):
+    dict_df = json.loads(jsonfile)
+    df = pd.read_json(dict_df['hhi'], orient='split')
+    df_filter = df[df['DM'] == baa][df['Period'] == period].sort_values(by='HHI', ascending = 'True')
+    df_filter = df_filter.tail(10)
+    fig = px.bar(df_filter, y='Utility', x='HHI', orientation = 'h')
+    fig.update_layout(height=450)
+    return fig
+
+
 
 app.layout = html.Div(children=[NAVBAR, BODY])
 if __name__ == '__main__':
