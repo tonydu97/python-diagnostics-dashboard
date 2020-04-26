@@ -61,33 +61,38 @@ NAVBAR = dbc.Navbar(
 
 LEFT_COLUMN = dbc.Jumbotron(
     [
-        dbc.Container(
-            [
-                html.H4(children='Inputs', className='display-5', style = {'fontSize': 36}),
-                html.Hr(className='my-2'),
-                html.Label('Select diagnostics file', className='lead'),
-                dcc.Dropdown(
-                    id='file-drop', clearable=False, style = {'marginBottom': 10, 'fontSize': 14},
-                    #options=[{'label':i, 'value':i} for i in os.listdir(dir_diagnostics)]
-                    options=[{'label':i, 'value':i} for i in [f for f in os.listdir(path_d) if f.endswith('.xlsx')]]
-                ),
-                dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
-                html.Div(style = {'marginBottom':25}),
-
-                html.Label('Select BAA', className='lead'),
-                dcc.Dropdown(
-                    id ='baa-drop', clearable = False, style={'marginBottom': 25}, disabled = True
-                ),
-                html.Label('Select Period', className='lead'),
-                dcc.Dropdown(
-                    id ='period-drop', clearable = False, style={'marginBottom': 0}, disabled = True,
-                    options = [{'label':i, 'value':i} for i in lst_periods]
+        dcc.Loading(
+            id = 'loading-inputs',
+            children = [
+                html.Div(id='store-df', style={'display' : 'none'}),
+                dbc.Container(
+                    [
+                        html.H4(children='Inputs', className='display-5', style = {'fontSize': 36}),
+                        html.Hr(className='my-2'),
+                        html.Label('Select diagnostics file', className='lead'),
+                        dcc.Dropdown(
+                            id='file-drop', clearable=False, style = {'marginBottom': 10, 'fontSize': 14},
+                            #options=[{'label':i, 'value':i} for i in os.listdir(dir_diagnostics)]
+                            options=[{'label':i, 'value':i} for i in [f for f in os.listdir(path_d) if f.endswith('.xlsx')]]
+                        ),
+                        dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
+                        html.Div(style = {'marginBottom':25}),
+                        html.Label('Select BAA', className='lead'),
+                        dcc.Dropdown(
+                            id ='baa-drop', clearable = False, style={'marginBottom': 25}, disabled = True
+                        ),
+                        html.Label('Select Period', className='lead'),
+                        dcc.Dropdown(
+                            id ='period-drop', clearable = False, style={'marginBottom': 0}, disabled = True,
+                            options = [{'label':i, 'value':i} for i in lst_periods]
+                        )
+                    ], fluid = True
                 )
-            ], fluid = True
+            ]
+
         )
     ],fluid = True
 )
-
 
 
 MMSUMMARY_PLOT = [
@@ -199,8 +204,8 @@ BODY = dbc.Container(
     [
         dbc.Row(
             [
-                dbc.Col(LEFT_COLUMN, md=2, align='center'),
-                dbc.Col(dbc.Card(MMSUMMARY_PLOT), md=10),
+                dbc.Col(LEFT_COLUMN, md=3, align='center'),
+                dbc.Col(dbc.Card(MMSUMMARY_PLOT)),
             ],
             style={'marginTop': 30},
         ),
@@ -210,7 +215,6 @@ BODY = dbc.Container(
             ],
             style={'marginTop': 30},
         ),
-        html.Div(id = 'store-df', style = {'display' : 'none'})
     ],
     className='mt-12', fluid = True
 )
