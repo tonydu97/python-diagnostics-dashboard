@@ -1,5 +1,6 @@
 import pathlib
 import os
+import glob
 
 
 import dash
@@ -14,9 +15,7 @@ import numpy as np
 
 
 # global vars
-dir_diagnostics = os.path.join(os.path.dirname(__file__), 'diagnostics/')
-paths = sorted(pathlib.Path(dir_diagnostics).iterdir(), key = os.path.getmtime)
-
+dir_diagnostics = 'C:/Users/tdu/python/python-diagnostics-dashboard/diagnostics/'
 lst_baa = ['FG', 'DUK', 'ALGAMS']
 lst_utilities = ['NextEra Energy Inc', 'Southern Co']
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
@@ -57,7 +56,7 @@ LEFT_COLUMN = dbc.Jumbotron(
         html.Label('Select raw results folder', className='lead'),
         dcc.Dropdown(
             id='raw-drop', clearable=False, style = {'marginBottom': 10},
-            options=[{'label':i, 'value':i} for i in paths]
+            options=[{'label':i, 'value':i} for i in os.listdir(dir_diagnostics)]
         ),
         dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
         html.Div(style = {'marginBottom':50}),
