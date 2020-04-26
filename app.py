@@ -14,9 +14,9 @@ import numpy as np
 
 
 # global vars
-raw_results_dir = 'C:/Users/tdu/python/Raw results/'
-lst_runs = [d for d in os.listdir(raw_results_dir) if os.path.isdir(os.path.join(raw_results_dir, d))]
-lst_runs.sort(reverse = True)
+dir_diagnostics = os.path.join(os.path.dirname(__file__), 'diagnostics/')
+paths = sorted(pathlib.Path(dir_diagnostics).iterdir(), key = os.path.getmtime)
+
 lst_baa = ['FG', 'DUK', 'ALGAMS']
 lst_utilities = ['NextEra Energy Inc', 'Southern Co']
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
@@ -25,7 +25,7 @@ lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', '
 
 
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.YETI])
 server = app.server  # for Heroku deployment
 
 
@@ -57,7 +57,7 @@ LEFT_COLUMN = dbc.Jumbotron(
         html.Label('Select raw results folder', className='lead'),
         dcc.Dropdown(
             id='raw-drop', clearable=False, style = {'marginBottom': 10},
-            options=[{'label':i, 'value':i} for i in lst_runs]
+            options=[{'label':i, 'value':i} for i in paths]
         ),
         dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
         html.Div(style = {'marginBottom':50}),
@@ -80,7 +80,6 @@ LEFT_COLUMN = dbc.Jumbotron(
 )
 
 
-#unused tab example
 MMSUMMARY_PLOT = [
     dbc.CardHeader(html.H5('Mmfile Summary')),
     dbc.CardBody(
