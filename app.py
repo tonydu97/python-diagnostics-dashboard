@@ -27,7 +27,6 @@ path_d = os.path.join(dirname, 'diagnostics/')
 #lst_rel = [f for f in os.listdir(relative_path) if f.endswith('.xlsx')]
 #lst_rel = os.listdir(relative_path)
 lst_baa = ['FG', 'DUK', 'ALGAMS']
-lst_utilities = ['NextEra Energy Inc', 'Southern Co']
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
 
 
@@ -164,7 +163,15 @@ BOTTOM_PLOTS = [
                                         children=[
                                             dcc.Loading(
                                                 id='loading-hhi',
-                                                children=[dcc.Graph(id='hhi-graph')], 
+                                                children=[
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(dcc.Graph(id='hhi-bar')),
+                                                            dbc.Col(dcc.Graph(id='hhi-pie'))
+                                                        ]
+
+                                                    )
+                                                ], 
                                                 type='default',
                                             )
                                         ],
@@ -172,22 +179,33 @@ BOTTOM_PLOTS = [
                                     dcc.Tab(
                                         label='Supply Curve',
                                         children=[
-                                            dcc.Loading(
-                                                id='loading-supply',
-                                                children=[dcc.Graph(id='supply-graph')],
-                                                type='default',
+                                            dbc.Row(
+                                                children=[
+                                                    dbc.Col(dcc.Dropdown(id='supply-owner-drop'), md=4)
+                                                ]
+                                            ),
+                                            dbc.Row(
+                                                children=[
+                                                    dbc.Col(dcc.Graph(id='supply-graph'))
+                                                ]
+
                                             )
-                                        ],
+                                        ], 
                                     ),
                                     dcc.Tab(
                                         label='Phase3X4X',
                                         children=[
-                                            dcc.Loading(
-                                                id ='loading-phase',
-                                                children = [dcc.Graph(id='phase-graph')],
-                                                type = 'default',
+                                            dbc.Row(
+                                                children=[
+                                                    dbc.Col(dcc.Dropdown(id='phase-utility-drop'), md=4)
+                                                ]
+                                            ),
+                                            dbc.Row(
+                                                children=[
+                                                    dbc.Col(dcc.Graph(id='phase-graph'))
+                                                ]
                                             )
-                                        ],
+                                        ], 
                                     ),
                                 ],
                             )
@@ -235,7 +253,6 @@ def enable_submitbtn(value):
     Output('period-drop', 'disabled')],
     [Input('import-btn', 'n_clicks')]
 )
-
 def enable_dropdowns(n_clicks):
     if n_clicks == 0:
         raise PreventUpdate
@@ -247,7 +264,6 @@ def enable_dropdowns(n_clicks):
     [Input('import-btn', 'n_clicks')],
     [State('file-drop', 'value')]
 )
-
 def load_df(n_clicks, file):
     if n_clicks == 0:
         raise PreventUpdate
@@ -263,10 +279,11 @@ def load_df(n_clicks, file):
     [Output('baa-drop', 'options'),
     Output('period-drop', 'options'),
     Output('baa-drop', 'value'),
-    Output('period-drop', 'value')],
+    Output('period-drop', 'value'),
+    Output('supply-owner-drop', 'options'),
+    Output('phase-utility-drop', 'options')],
     [Input('store-df', 'children')]
 )
-
 def populate_dropdowns(jsonfile):
     if jsonfile == None:
         raise PreventUpdate
@@ -274,7 +291,13 @@ def populate_dropdowns(jsonfile):
         dict_df = json.loads(jsonfile)
         df_baa = pd.read_json(dict_df['baa'], orient='split')
         lst_baa = df_baa['DM'].tolist()
-        return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], lst_baa[0], lst_periods[0]
+
+        df_gen = pd.read_json(dict_df['gen'], orient='split')
+        lst_utilities = df_gen['UTILITY'].unique().tolist()
+
+        return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], lst_baa[0], lst_periods[0],[
+            {'label':i, 'value':i} for i in lst_utilities], [{'label':i, 'value':i} for i in lst_utilities]
+        
 
 @app.callback(
     Output('gen-graph', 'figure'),
@@ -282,7 +305,6 @@ def populate_dropdowns(jsonfile):
     Input('period-drop', 'value')],
     [State('store-df', 'children')] 
 )    
-
 def update_gen_graph(baa, period, jsonfile):
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['gen'], orient='split')
@@ -297,7 +319,6 @@ def update_gen_graph(baa, period, jsonfile):
     Input('period-drop', 'value')],
     [State('store-df', 'children')] 
 )    
-
 def update_load_graph(baa, period, jsonfile):
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['loads'], orient='split')
@@ -312,7 +333,6 @@ def update_load_graph(baa, period, jsonfile):
     Input('period-drop', 'value')],
     [State('store-df', 'children')] 
 )    
-
 def update_tx_graph(baa, period, jsonfile):
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['tx'], orient='split')
@@ -335,22 +355,44 @@ def update_tx_graph(baa, period, jsonfile):
 
 
 @app.callback(
-    Output('hhi-graph', 'figure'),
+    [Output('hhi-bar', 'figure'),
+    Output('hhi-pie', 'figure')],
     [Input('baa-drop', 'value'),
     Input('period-drop', 'value')],
     [State('store-df', 'children')]
 )
-
-def update_hhi_graph(baa, period, jsonfile):
+def update_hhi_graphs(baa, period, jsonfile):
+    #TODO Update pie chart to group all others not in top10
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['hhi'], orient='split')
     df_filter = df[df['DM'] == baa][df['Period'] == period].sort_values(by='HHI', ascending = 'True')
     df_filter = df_filter.tail(10)
-    fig = px.bar(df_filter, y='Utility', x='HHI', orientation = 'h')
-    fig.update_layout(height=450)
+
+    fig_bar = px.bar(df_filter, y='Utility', x='HHI', orientation = 'h', title='Top Players - HHI', hover_data=['MW'])
+    #fig_bar.update_layout(height=450)
+
+    fig_pie = px.pie(df_filter, values='Share', names='Utility', title='Top Players - Market Share', hover_data=['MW'])
+    return fig_bar, fig_pie
+
+@app.callback(
+    Output('phase-graph', 'figure'),
+    [Input('baa-drop', 'value'),
+    Input('period-drop', 'value'),
+    Input('phase-utility-drop', 'value')],
+    [State('store-df', 'children')]
+)
+def update_phase_graph(baa, period, utility, jsonfile):
+    if utility == None:
+        raise PreventUpdate
+    dict_df = json.loads(jsonfile)
+    df = pd.read_json(dict_df['phase'], orient='split')
+    df_filter = df[(df['CA'] == baa) & (df['Period'] == period) & (df['Utility'] == utility)]
+    fig = go.Figure(data=[
+        go.Bar(name='3X Gen', x=df_filter['CA'] , y=df_filter['3X']),
+        go.Bar(name='4X Gen', x=df_filter['CA'] , y=df_filter['4X'])
+    ])
+    fig.update_layout(barmode='group')
     return fig
-
-
 
 app.layout = html.Div(children=[NAVBAR, BODY])
 if __name__ == '__main__':
