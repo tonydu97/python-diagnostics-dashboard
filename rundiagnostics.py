@@ -2,8 +2,8 @@
 4/25/20
 Tony Du
 
-Diagnostics suite for M&A DPT Analysis
-Processes raw results folder 
+Diagnostics for M&A DPT Analysis
+Processes raw results 
 Creates input xlsx file to be used for dashboard visualization and analysis
 
 
@@ -18,7 +18,7 @@ case = 'jli_v21_FG_5SILs_pjm_origMCP_pre_plus'
 
 # TODO use __file__
 inputfolder = folder + case + '/'
-output = 'diagnostics/diagnostics_'+ case + '.xlsx'
+output = 'diagnostics/d_'+ case + '.xlsx'
 
 file_x = inputfolder + [i for i in os.listdir(inputfolder) if os.path.isfile(os.path.join(inputfolder, i)) and 'x - data' in i][0]
 file_3x = inputfolder + [i for i in os.listdir(inputfolder) if os.path.isfile(os.path.join(inputfolder, i)) and 'Phase3X' in i][0]
@@ -28,7 +28,6 @@ file_hhi = inputfolder + [i for i in os.listdir(inputfolder) if os.path.isfile(o
 
 lst_periods = ['S_SP1','S_SP2','S_P','S_OP','W_SP','W_P','W_OP','H_SP','H_P','H_OP']
 writer = pd.ExcelWriter(output, engine='xlsxwriter')
-
 
 
 def mm_summary():
@@ -72,13 +71,13 @@ def mm_summary():
     df_wheel_out = df_wheel.drop(['From_CA'], axis=1).groupby(['To_CA', 'Period']).mean().reset_index()
 
     # export to excel
-    df_BAA.to_excel(writer, index=False, sheet_name ='baa')
-    df_mcp.to_excel(writer, index=False, sheet_name='mcp')
-    df_loads.to_excel(writer, index=False, sheet_name='loads')
-    df_loss.to_excel(writer, index=False, sheet_name='lineloss')
-    df_gen_out.to_excel(writer, index=False, sheet_name='gen')
-    df_tx_out.to_excel(writer, index=False, sheet_name='tx')
-    df_wheel_out.to_excel(writer, index=False, sheet_name='wheel')
+    # df_BAA.to_excel(writer, index=False, sheet_name ='baa')
+    # df_mcp.to_excel(writer, index=False, sheet_name='mcp')
+    # df_loads.to_excel(writer, index=False, sheet_name='loads')
+    # df_loss.to_excel(writer, index=False, sheet_name='lineloss')
+    # df_gen_out.to_excel(writer, index=False, sheet_name='gen')
+    # df_tx_out.to_excel(writer, index=False, sheet_name='tx')
+    # df_wheel_out.to_excel(writer, index=False, sheet_name='wheel')
 
     print('mm summary complete')
 

@@ -272,7 +272,20 @@ def update_tx_graph(baa, period, jsonfile):
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['tx'], orient='split')
     df_filter = df[(df['To_CA'] == baa) | (df['From_CA'] == baa)][df['PERIOD'] == period].sort_values(by='To_CA', ascending=True)
-    fig = px.bar(df_filter, y='To_CA', x='tx_line_MW', color='To_CA' , orientation = 'h')
+    unique = pd.unique(df_filter[['To_CA', 'From_CA']].values.ravel('K')).tolist()
+    unique.remove(baa)
+
+    df_graph = pd.DataFrame(index=unique)
+    df_from = df_filter[df_filter['From_CA'] != baa].set_index(['From_CA'])
+    df_to = df_filter[df_filter['To_CA'] != baa].set_index(['To_CA'])
+    df_graph['To_CA'] = df_to['tx_line_MW']
+    df_graph['From_CA'] = df_from['tx_line_MW']    
+
+    fig = go.Figure(data=[
+        go.Bar(name='To_CA', x=df_graph.index , y=df_graph['To_CA']),
+        go.Bar(name='From_CA', x=df_graph.index , y=df_graph['From_CA'])
+    ])
+    fig.update_layout(barmode='group')
     return fig
     #TODO make this into three column df based on selected baa: CA, TO(MW), FROM(MW)
 
