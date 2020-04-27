@@ -127,6 +127,20 @@ def supply_curve():
     df_supply.to_excel(writer, index=False, sheet_name='supply')
     print('supply curve complete')
 
+
+
+
+#supply curve tests
+df_supply = pd.read_excel(file_x, sheet_name='DPT_supply_curve')
+df_supply.rename(columns={'Prime mover' : 'Type', 'Marginal cost' : 'MC', 'Capacity (MW)' :'Capacity'}, inplace=True)
+df_supply = df_supply[['Period', 'BAA', 'Generator', 'Owner', 'Type', 'MC', 'Capacity']]
+df_supply['MC'] = df_supply['MC'].round(2)
+df_supply['Capacity'] = df_supply['Capacity'].round(0)
+print('supply curve complete')
+df_load = pd.read_excel(file_mm, sheet_name='loads')
+
+
+
 mm_summary()
 top_players()
 supply_curve()

@@ -1,3 +1,40 @@
+'''
+
+DPT Diagnostics Dashboard
+Tony Du
+
+
+Web Browser Dashboard for M&A DPT Diagnostics
+Visualization and Reporting is generated on the fly
+Use 'rundiagnostics.py' to generate input file
+
+
+
+v1 Beta 4/26/20
+
+Updates
+- initial version
+- Supported Diagnostics:
+    - MMfile Summary (Generation, Load, Transmission)
+    - Top Players
+    - Phase3x4x by DM by Period
+    - Supply Curve and MCP Sensitivity (partial WIP)
+
+
+
+To-Do
+- Add MCP and Wheeling rate Information to dashboard (already generated in input file)
+- Fix Top Players Pie Chart to show combined non Top Players
+- Add MCP and AEC vs Non-Eco distinction to Supply Curve
+- Fix card resizing
+
+'''
+
+
+
+
+
+
 import pathlib
 import os
 import glob
@@ -203,8 +240,8 @@ BOTTOM_PLOTS = [
                                                     ),
                                                     dbc.Row(
                                                         children=[
-                                                            dbc.Col(dcc.Graph(id='hhi-bar')),
-                                                            dbc.Col(dcc.Graph(id='hhi-pie'))
+                                                            dbc.Col(dcc.Graph(id='hhi-bar'), md=6),
+                                                            dbc.Col(dcc.Graph(id='hhi-pie'), md=6)
                                                         ]
 
                                                     )
@@ -329,7 +366,9 @@ def load_df(n_clicks, file):
     Output('baa-drop', 'value'),
     Output('period-drop', 'value'),
     Output('supply-owner-drop', 'options'),
-    Output('phase-utility-drop', 'options')],
+    Output('phase-utility-drop', 'options'),
+    Output('supply-owner-drop', 'value'),
+    Output('phase-utility-drop', 'value')],
     [Input('store-df', 'children')]
 )
 def populate_dropdowns(jsonfile):
@@ -344,7 +383,7 @@ def populate_dropdowns(jsonfile):
         lst_utilities = df_gen['UTILITY'].unique().tolist()
 
         return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], lst_baa[0], lst_periods[0],[
-            {'label':i, 'value':i} for i in lst_utilities], [{'label':i, 'value':i} for i in lst_utilities]
+            {'label':i, 'value':i} for i in lst_utilities], [{'label':i, 'value':i} for i in lst_utilities], lst_utilities[0], lst_utilities[0]
         
 
 @app.callback(
@@ -450,6 +489,45 @@ def update_phase_graph(baa, period, utility, jsonfile):
     ])
     fig.update_layout(barmode='group')
     return fig
+
+
+@app.callback(
+    Output('supply-graph', 'figure'),
+    [Input('baa-drop', 'value'),
+    Input('period-drop', 'value'),
+    Input('supply-owner-drop', 'value')],
+    [State('store-df', 'children')]
+)
+
+def update_supply_graph(baa, period, utility, jsonfile):
+    if utility == None:
+        raise PreventUpdate
+    dict_df = json.loads(jsonfile)
+
+    df_load = pd.read_json(dict_df['loads'], orient='split')
+    df_load = df_load[(df_load['CA'] == baa) & (df_load['PERIOD'] == period) & (df_load['UTILITY'] == utility)]
+    load_slice = df_load.loc[:,'LOAD']
+    if len(load_slice) == 0:
+        loadreq = 0
+    else:
+        loadreq = float(load_slice)
+
+    df = pd.read_json(dict_df['supply'], orient='split')
+    df_filter = df[(df['BAA'] == baa) & (df['Period'] == period) & (df['Owner'] == utility)].sort_values(by=['MC'])
+    df_filter['cum_MW'] = df_filter['Capacity'].cumsum()
+
+    fig = px.scatter(df_filter, x='cum_MW', y='MC', color ='Type', hover_name = 'Generator', hover_data=['Capacity'])
+    fig.update_layout(shapes=[
+        dict(
+        type= 'line',
+        yref= 'paper', y0= 0, y1= 1,
+        xref= 'x', x0=loadreq, x1=loadreq
+        )
+    ])
+    return fig
+
+
+
 app.title = 'Diagnostics Dashboard'
 app.layout = html.Div(children=[NAVBAR, BODY])
 if __name__ == '__main__':
