@@ -110,7 +110,28 @@ MMSUMMARY_PLOT = [
                                         children=[
                                             dcc.Loading(
                                                 id='loading-gen',
-                                                children=[dcc.Graph(id='gen-graph')], #graph fixed size set in callback function on figure
+                                                children=[
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(html.P(children='Utilities to include'), md = 1),
+                                                            dbc.Col(
+                                                                dbc.InputGroup(
+                                                                    children=[
+                                                                        dbc.Input(id='gen-input', type='number', min='1', max='20', value=5),
+                                                                        dbc.InputGroupAddon(
+                                                                            dbc.Button(id='gen-submit-btn', children='Update', color='primary'),
+                                                                            addon_type='append'
+                                                                        )
+                                                                    ]
+                                                                ), md=2
+                                                            ),
+                                                        ]
+                                                    ),
+                                                    dbc.Row(
+                                                        dbc.Col(children=[dcc.Graph(id='gen-graph')], md=12)
+                                                    )
+                                                    #dcc.Graph(id='gen-graph')
+                                                ], 
                                                 type='default',
                                             )
                                         ],
@@ -166,6 +187,22 @@ BOTTOM_PLOTS = [
                                                 children=[
                                                     dbc.Row(
                                                         children=[
+                                                            dbc.Col(html.P(children='Top players to include'), md = 1),
+                                                            dbc.Col(
+                                                                dbc.InputGroup(
+                                                                    children=[
+                                                                        dbc.Input(id='hhi-input', type='number', min='1', max='20', value=10),
+                                                                        dbc.InputGroupAddon(
+                                                                            dbc.Button(id='hhi-submit-btn', children='Update', color='primary'),
+                                                                            addon_type='append'
+                                                                        )
+                                                                    ]
+                                                                ), md=2
+                                                            ),
+                                                        ],style = {'marginTop' : 10}
+                                                    ),
+                                                    dbc.Row(
+                                                        children=[
                                                             dbc.Col(dcc.Graph(id='hhi-bar')),
                                                             dbc.Col(dcc.Graph(id='hhi-pie'))
                                                         ]
@@ -179,32 +216,43 @@ BOTTOM_PLOTS = [
                                     dcc.Tab(
                                         label='Supply Curve',
                                         children=[
-                                            dbc.Row(
+                                            dcc.Loading(
+                                                id='loading-supply',
                                                 children=[
-                                                    dbc.Col(dcc.Dropdown(id='supply-owner-drop'), md=4)
-                                                ]
-                                            ),
-                                            dbc.Row(
-                                                children=[
-                                                    dbc.Col(dcc.Graph(id='supply-graph'))
-                                                ]
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(dcc.Dropdown(id='supply-owner-drop'), md=4)
+                                                        ]
+                                                    ),
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(dcc.Graph(id='supply-graph'))
+                                                        ]
 
+                                                    )
+                                                ]
                                             )
                                         ], 
                                     ),
                                     dcc.Tab(
                                         label='Phase3X4X',
                                         children=[
-                                            dbc.Row(
+                                            dcc.Loading(
+                                                id='loading-phase',
                                                 children=[
-                                                    dbc.Col(dcc.Dropdown(id='phase-utility-drop'), md=4)
-                                                ]
-                                            ),
-                                            dbc.Row(
-                                                children=[
-                                                    dbc.Col(dcc.Graph(id='phase-graph'))
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(dcc.Dropdown(id='phase-utility-drop'), md=4)
+                                                        ]
+                                                    ),
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(dcc.Graph(id='phase-graph'))
+                                                        ]
+                                                    )
                                                 ]
                                             )
+
                                         ], 
                                     ),
                                 ],
@@ -302,15 +350,20 @@ def populate_dropdowns(jsonfile):
 @app.callback(
     Output('gen-graph', 'figure'),
     [Input('baa-drop', 'value'),
-    Input('period-drop', 'value')],
-    [State('store-df', 'children')] 
+    Input('period-drop', 'value'),
+    Input('gen-submit-btn', 'n_clicks')],
+    [State('store-df', 'children'),
+    State('gen-input', 'value')] 
 )    
-def update_gen_graph(baa, period, jsonfile):
+def update_gen_graph(baa, period, n_clicks, jsonfile, num):
+    if jsonfile == None:
+        raise PreventUpdate
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['gen'], orient='split')
     df_filter = df[df['CA'] == baa][df['PERIOD'] == period].sort_values(by='gen_MW', ascending=True)
+    df_filter = df_filter.tail(num)
     fig = px.bar(df_filter, y='UTILITY', x='gen_MW', orientation = 'h')
-    fig.update_layout(height=450)
+    #fig.update_layout(height=450)
     return fig
 
 @app.callback(
@@ -358,15 +411,19 @@ def update_tx_graph(baa, period, jsonfile):
     [Output('hhi-bar', 'figure'),
     Output('hhi-pie', 'figure')],
     [Input('baa-drop', 'value'),
-    Input('period-drop', 'value')],
-    [State('store-df', 'children')]
+    Input('period-drop', 'value'),
+    Input('hhi-submit-btn', 'n_clicks')],
+    [State('hhi-input', 'value'),
+    State('store-df', 'children')]
 )
-def update_hhi_graphs(baa, period, jsonfile):
+def update_hhi_graphs(baa, period, n_clicks, playernum, jsonfile):
     #TODO Update pie chart to group all others not in top10
+    if baa == None:
+        raise PreventUpdate
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['hhi'], orient='split')
     df_filter = df[df['DM'] == baa][df['Period'] == period].sort_values(by='HHI', ascending = 'True')
-    df_filter = df_filter.tail(10)
+    df_filter = df_filter.tail(playernum)
 
     fig_bar = px.bar(df_filter, y='Utility', x='HHI', orientation = 'h', title='Top Players - HHI', hover_data=['MW'])
     #fig_bar.update_layout(height=450)
