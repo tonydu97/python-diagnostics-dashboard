@@ -258,7 +258,7 @@ BOTTOM_PLOTS = [
                                                 children=[
                                                     dbc.Row(
                                                         children=[
-                                                            dbc.Col(dcc.Dropdown(id='supply-owner-drop'), md=4)
+                                                            dbc.Col(dcc.Dropdown(id='supply-owner-drop', clearable=False), md=4)
                                                         ]
                                                     ),
                                                     dbc.Row(
@@ -279,7 +279,7 @@ BOTTOM_PLOTS = [
                                                 children=[
                                                     dbc.Row(
                                                         children=[
-                                                            dbc.Col(dcc.Dropdown(id='phase-utility-drop'), md=4)
+                                                            dbc.Col(dcc.Dropdown(id='phase-utility-drop', clearable=False), md=4)
                                                         ]
                                                     ),
                                                     dbc.Row(
@@ -380,10 +380,13 @@ def populate_dropdowns(jsonfile):
         lst_baa = df_baa['DM'].tolist()
 
         df_gen = pd.read_json(dict_df['gen'], orient='split')
-        lst_utilities = df_gen['UTILITY'].unique().tolist()
+        first_baa = lst_baa[0]
+        first_period = lst_periods[0]
+        lst_utilities = df_gen[(df_gen['CA'] == first_baa)&(df_gen['PERIOD'] == first_period)]['UTILITY'].unique().tolist()
+        first_utility = lst_utilities[0]
 
-        return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], lst_baa[0], lst_periods[0],[
-            {'label':i, 'value':i} for i in lst_utilities], [{'label':i, 'value':i} for i in lst_utilities], lst_utilities[0], lst_utilities[0]
+        return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], first_baa, first_period,[
+            {'label':i, 'value':i} for i in lst_utilities], [{'label':i, 'value':i} for i in lst_utilities], first_utility, first_utility
         
 
 @app.callback(
