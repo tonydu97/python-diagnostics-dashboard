@@ -9,24 +9,17 @@ Visualization and Reporting is generated on the fly
 Use 'rundiagnostics.py' to generate input file
 
 
-
-v1 Beta 4/26/20
+v1.1 Beta 5/4/20
 
 Updates
-- initial version
-- Supported Diagnostics:
-    - MMfile Summary (Generation, Load, Transmission)
-    - Top Players
-    - Phase3x4x by DM by Period
-    - Supply Curve and MCP Sensitivity (partial WIP)
-
-
+- Fix Top Players Pie Chart
+- Changed Phase3x4x graph into datatable
 
 To-Do
 - Add MCP and Wheeling rate Information to dashboard (already generated in input file)
-- Fix Top Players Pie Chart to show combined non Top Players
+- Card/Tab resizing 
 - Add MCP and AEC vs Non-Eco distinction to Supply Curve
-- Fix card resizing
+
 
 '''
 
@@ -269,14 +262,22 @@ BOTTOM_PLOTS = [
                                             dcc.Loading(
                                                 id='loading-phase',
                                                 children=[
+
                                                     dbc.Row(
                                                         children=[
-                                                            dbc.Col(dcc.Dropdown(id='phase-utility-drop', clearable=False), md=4)
-                                                        ]
-                                                    ),
-                                                    dbc.Row(
-                                                        children=[
-                                                            dbc.Col(dcc.Graph(id='phase-graph'))
+                                                            dbc.Col(
+                                                                dash_table.DataTable(
+                                                                    id='phase-datatable',
+                                                                    editable=True,
+                                                                    filter_action='native',
+                                                                    sort_action='native',
+                                                                    sort_mode='multi',
+                                                                    page_action='none',
+                                                                    style_cell={'width': '20%'},
+                                                                    fixed_rows={'headers':True},
+                                                                    style_table={'height': '500px', 'overflowY': 'auto'}
+                                                                )
+                                                            )
                                                         ]
                                                     )
                                                 ]
@@ -487,25 +488,56 @@ def update_hhi_graphs(baa, period, n_clicks, playernum, jsonfile):
     fig_pie = px.pie(df_pie, values='Share', names='Utility', title='Top Players - Market Share', hover_data=['MW'])
     return fig_bar, fig_pie
 
+
+# ## OLD Phase Graph OLD ###
+# @app.callback(
+#     Output('phase-graph', 'figure'),
+#     [Input('baa-drop', 'value'),
+#     Input('period-drop', 'value'),
+#     Input('phase-utility-drop', 'value')],
+#     [State('store-df', 'children')]
+# )
+# def update_phase_graph(baa, period, utility, jsonfile):
+#     if utility == None:
+#         raise PreventUpdate
+#     dict_df = json.loads(jsonfile)
+#     df = pd.read_json(dict_df['phase'], orient='split')
+#     df_filter = df[(df['DM'] == baa) & (df['Period'] == period) & (df['Utility'] == utility)]
+#     fig = go.Figure(data=[
+#         go.Bar(name='3X Gen', x=df_filter['CA'] , y=df_filter['3X']),
+#         go.Bar(name='4X Gen', x=df_filter['CA'] , y=df_filter['4X'])
+#     ])
+#     fig.update_layout(barmode='group')
+#     return fig
+
 @app.callback(
-    Output('phase-graph', 'figure'),
+    [Output('phase-datatable', 'columns'),
+    Output('phase-datatable', 'data')],
     [Input('baa-drop', 'value'),
-    Input('period-drop', 'value'),
-    Input('phase-utility-drop', 'value')],
+    Input('period-drop', 'value')],
     [State('store-df', 'children')]
 )
-def update_phase_graph(baa, period, utility, jsonfile):
-    if utility == None:
-        raise PreventUpdate
+def update_phase_table(baa, period, jsonfile):
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['phase'], orient='split')
-    df_filter = df[(df['DM'] == baa) & (df['Period'] == period) & (df['Utility'] == utility)]
-    fig = go.Figure(data=[
-        go.Bar(name='3X Gen', x=df_filter['CA'] , y=df_filter['3X']),
-        go.Bar(name='4X Gen', x=df_filter['CA'] , y=df_filter['4X'])
-    ])
-    fig.update_layout(barmode='group')
-    return fig
+    df_filter = df[(df['DM'] == baa) & (df['Period'] == period)]
+    df_filter = df_filter[['Utility', 'CA', '3X', '4X']]
+    columns = [{"name": i, "id": i, "deletable": True, "selectable": True} for i in df_filter.columns]
+    data = df_filter.to_dict('records')
+    return columns, data
+
+@app.callback( #necessary callback in order to filter
+    Output('phase-datatable', 'style_data_conditional'),
+    [Input('phase-datatable', 'selected_columns')]
+)
+def update_table_styles(selected_columns):
+    if selected_columns == None:
+        raise PreventUpdate
+    return [{
+        'if': { 'column_id': i },
+        'background_color': '#D2F3FF'
+    } for i in selected_columns]
+
 
 
 @app.callback(
@@ -548,4 +580,4 @@ def update_supply_graph(baa, period, utility, jsonfile):
 app.title = 'Diagnostics Dashboard'
 app.layout = html.Div(children=[NAVBAR, BODY])
 if __name__ == '__main__':
-    app.run_server(host='127.0.0.1', port='8050', debug=True)
+    app.run_server(host='127.0.0.1', port='8050', debug=True, dev_tools_ui=True)
