@@ -31,10 +31,6 @@ To-Do
 '''
 
 
-
-
-
-
 import pathlib
 import os
 import glob
@@ -61,9 +57,6 @@ import plotly.express as px
 dir_absolute = 'C:/Users/tdu/python/python-diagnostics-dashboard/diagnostics/'
 dirname = os.path.dirname(__file__)
 path_d = os.path.join(dirname, 'diagnostics/')
-#lst_rel = [f for f in os.listdir(relative_path) if f.endswith('.xlsx')]
-#lst_rel = os.listdir(relative_path)
-lst_baa = ['FG', 'DUK', 'ALGAMS']
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
 
 
@@ -77,10 +70,9 @@ server = app.server  # for Heroku deployment
 NAVBAR = dbc.Navbar(
     children=[
         html.A(
-            # Use row and col to control vertical alignment of logo / brand
             dbc.Row(
                 [
-                    dbc.Col(html.Img(src=app.get_asset_url('cra-logo.png'), height='30px')),
+                    dbc.Col(html.Img(src=app.get_asset_url('branding.png'), height='40px')),
                     dbc.Col(
                         dbc.NavbarBrand('DPT Diagnostics Dashboard - Beta', className='ml-2')
                     ),
@@ -90,8 +82,8 @@ NAVBAR = dbc.Navbar(
             ),
         )
     ],
-    color='light',
-    #dark=True,
+    color='primary',
+    dark=True,
     sticky='top',
 )
 
@@ -378,8 +370,6 @@ def populate_dropdowns(jsonfile):
         dict_df = json.loads(jsonfile)
         df_baa = pd.read_json(dict_df['baa'], orient='split')
         lst_baa = df_baa['DM'].tolist()
-
-        df_gen = pd.read_json(dict_df['gen'], orient='split')
         first_baa = lst_baa[0]
         first_period = lst_periods[0]
 
@@ -478,13 +468,23 @@ def update_hhi_graphs(baa, period, n_clicks, playernum, jsonfile):
         raise PreventUpdate
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['hhi'], orient='split')
-    df_filter = df[df['DM'] == baa][df['Period'] == period].sort_values(by='HHI', ascending = 'True')
-    df_filter = df_filter.tail(playernum)
+    df_filter = df[df['DM'] == baa][df['Period'] == period].sort_values(by='HHI', ascending = False)
+    #df_filter = df_filter.tail(playernum)
 
-    fig_bar = px.bar(df_filter, y='Utility', x='HHI', orientation = 'h', title='Top Players - HHI', hover_data=['MW'])
+    df_top = df_filter.sort_values(by='HHI', ascending = False).iloc[:playernum] 
+    df_others = df_filter.sort_values(by='HHI', ascending = False).iloc[playernum:]
+    df_others.loc['Total'] = df_others.sum(numeric_only = True, axis = 0)
+    df_others.loc['Total', 'Utility'] = 'Other'
+    df_top = df_top.sort_values(by='HHI', ascending = True)
+    df_pie = df_top.append(df_others.loc['Total'])
+
+
+    fig_bar = px.bar(df_top, y='Utility', x='HHI', orientation = 'h', title='Top Players - HHI', hover_data=['MW'])
     #fig_bar.update_layout(height=450)
 
-    fig_pie = px.pie(df_filter, values='Share', names='Utility', title='Top Players - Market Share', hover_data=['MW'])
+    
+
+    fig_pie = px.pie(df_pie, values='Share', names='Utility', title='Top Players - Market Share', hover_data=['MW'])
     return fig_bar, fig_pie
 
 @app.callback(
