@@ -364,11 +364,11 @@ def load_df(n_clicks, file):
     [Output('baa-drop', 'options'),
     Output('period-drop', 'options'),
     Output('baa-drop', 'value'),
-    Output('period-drop', 'value'),
-    Output('supply-owner-drop', 'options'),
-    Output('phase-utility-drop', 'options'),
-    Output('supply-owner-drop', 'value'),
-    Output('phase-utility-drop', 'value')],
+    Output('period-drop', 'value')],
+    # Output('supply-owner-drop', 'options'),
+    # Output('phase-utility-drop', 'options'),
+    # Output('supply-owner-drop', 'value'),
+    # Output('phase-utility-drop', 'value')],
     [Input('store-df', 'children')]
 )
 def populate_dropdowns(jsonfile):
@@ -382,12 +382,26 @@ def populate_dropdowns(jsonfile):
         df_gen = pd.read_json(dict_df['gen'], orient='split')
         first_baa = lst_baa[0]
         first_period = lst_periods[0]
-        lst_utilities = df_gen[(df_gen['CA'] == first_baa)&(df_gen['PERIOD'] == first_period)]['UTILITY'].unique().tolist()
-        first_utility = lst_utilities[0]
 
-        return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], first_baa, first_period,[
-            {'label':i, 'value':i} for i in lst_utilities], [{'label':i, 'value':i} for i in lst_utilities], first_utility, first_utility
-        
+
+        return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], first_baa, first_period
+
+@app.callback(
+    [Output('supply-owner-drop', 'value'),
+    Output('supply-owner-drop', 'options')],
+    [Input('baa-drop', 'value'),
+    Input('period-drop', 'value')],
+    [State('store-df', 'children')]
+)
+
+def populate_owner_dropdown(baa, period, jsonfile):
+    # if baa == None | period == None:
+    #     raise PreventUpdate
+    dict_df = json.loads(jsonfile)
+    df = pd.read_json(dict_df['supply'], orient='split')
+    df = df[(df['BAA'] == baa) & (df['Period'] == period)]
+    lst_owners = df['Owner'].unique().tolist()
+    return lst_owners[0], [{'label':i, 'value':i} for i in lst_owners]
 
 @app.callback(
     Output('gen-graph', 'figure'),
