@@ -92,7 +92,6 @@ LEFT_COLUMN = dbc.Jumbotron(
                         html.Label('Select diagnostics file', className='lead'),
                         dcc.Dropdown(
                             id='file-drop', clearable=False, style = {'marginBottom': 10, 'fontSize': 14},
-                            #options=[{'label':i, 'value':i} for i in os.listdir(dir_diagnostics)]
                             options=[{'label':i, 'value':i} for i in [f for f in os.listdir(path_d) if f.endswith('.xlsx')]]
                         ),
                         dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
@@ -115,7 +114,7 @@ LEFT_COLUMN = dbc.Jumbotron(
 )
 
 
-MMSUMMARY_PLOT = [
+DPTSUMMARY_PLOT = [
     dbc.CardHeader(html.H5('DPT input file summary')),
     dbc.CardBody(
         [
@@ -134,7 +133,7 @@ MMSUMMARY_PLOT = [
                                                 children=[
                                                     dbc.Row(
                                                         children=[
-                                                            dbc.Col(html.P(children='Utilities to include'), md = 1),
+                                                            dbc.Col(html.P(children='Utilities to include'), width=1),
                                                             dbc.Col(
                                                                 dbc.InputGroup(
                                                                     children=[
@@ -144,14 +143,13 @@ MMSUMMARY_PLOT = [
                                                                             addon_type='append'
                                                                         )
                                                                     ]
-                                                                ), md=2
+                                                                ), width=2
                                                             ),
                                                         ]
                                                     ),
                                                     dbc.Row(
-                                                        dbc.Col(children=[dcc.Graph(id='gen-graph')], md=12)
+                                                        dbc.Col(children=[dcc.Graph(id='gen-graph')], width=12)
                                                     )
-                                                    #dcc.Graph(id='gen-graph')
                                                 ], 
                                                 type='default',
                                             )
@@ -168,19 +166,26 @@ MMSUMMARY_PLOT = [
                                         ],
                                     ),
                                     dcc.Tab(
-                                        label='Transmission',
+                                        label='Transmission (From CA)',
                                         children=[
                                             dcc.Loading(
                                                 id ='loading-transmission',
-                                                children = [dcc.Graph(id='tx-graph')],
+                                                children = [
+                                                    dbc.Row(dbc.Col(html.P('SIL:', id='sil'))),
+                                                    dbc.Row(dbc.Col(dcc.Graph(id='tx-graph'), width=12)),
+                                                    
+                                                    ],
                                                 type = 'default',
                                             )
                                         ],
                                     ),
+                                    dcc.Tab(
+                                        label='MCP and Wheeling Rates'
+                                    )
                                 ],
                             )
                         ],
-                        #md=12,
+                        #width=12,
                     ),
                 ]
             )
@@ -208,7 +213,7 @@ BOTTOM_PLOTS = [
                                                 children=[
                                                     dbc.Row(
                                                         children=[
-                                                            dbc.Col(html.P(children='Top players to include'), md = 1),
+                                                            dbc.Col(html.P(children='Top players to include'), width=1),
                                                             dbc.Col(
                                                                 dbc.InputGroup(
                                                                     children=[
@@ -218,14 +223,14 @@ BOTTOM_PLOTS = [
                                                                             addon_type='append'
                                                                         )
                                                                     ]
-                                                                ), md=2
+                                                                ), width=2
                                                             ),
                                                         ],style = {'marginTop' : 10}
                                                     ),
                                                     dbc.Row(
                                                         children=[
-                                                            dbc.Col(dcc.Graph(id='hhi-bar'), md=6),
-                                                            dbc.Col(dcc.Graph(id='hhi-pie'), md=6)
+                                                            dbc.Col(dcc.Graph(id='hhi-bar'), width=6),
+                                                            dbc.Col(dcc.Graph(id='hhi-pie'), width=6)
                                                         ]
 
                                                     )
@@ -242,7 +247,7 @@ BOTTOM_PLOTS = [
                                                 children=[
                                                     dbc.Row(
                                                         children=[
-                                                            dbc.Col(dcc.Dropdown(id='supply-owner-drop', clearable=False), md=4)
+                                                            dbc.Col(dcc.Dropdown(id='supply-owner-drop', clearable=False), width=4)
                                                         ]
                                                     ),
                                                     dbc.Row(
@@ -256,7 +261,7 @@ BOTTOM_PLOTS = [
                                         ], 
                                     ),
                                     dcc.Tab(
-                                        label='Phase3X4X (3x - Round 1 and 4x',
+                                        label='Phase3X4X (3x - Round 1 and 4x)',
                                         children=[
                                             dcc.Loading(
                                                 id='loading-phase',
@@ -299,8 +304,8 @@ BODY = dbc.Container(
     [
         dbc.Row(
             [
-                dbc.Col(LEFT_COLUMN, md=3, align='center'),
-                dbc.Col(dbc.Card(MMSUMMARY_PLOT), md=9),
+                dbc.Col(LEFT_COLUMN, width=3, align='center'),
+                dbc.Col(dbc.Card(DPTSUMMARY_PLOT), width=9),
             ],
             style={'marginTop': 30},
         ),
@@ -357,10 +362,6 @@ def load_df(n_clicks, file):
     Output('period-drop', 'options'),
     Output('baa-drop', 'value'),
     Output('period-drop', 'value')],
-    # Output('supply-owner-drop', 'options'),
-    # Output('phase-utility-drop', 'options'),
-    # Output('supply-owner-drop', 'value'),
-    # Output('phase-utility-drop', 'value')],
     [Input('store-df', 'children')]
 )
 def populate_dropdowns(jsonfile):
@@ -444,7 +445,8 @@ def update_load_graph(baa, period, jsonfile):
     return fig
 
 @app.callback(
-    Output('tx-graph', 'figure'),
+    [Output('tx-graph', 'figure'),
+    Output('sil', 'children')],
     [Input('baa-drop', 'value'),
     Input('period-drop', 'value')],
     [State('store-df', 'children')] 
@@ -460,14 +462,19 @@ def update_tx_graph(baa, period, jsonfile):
     df_from = df_filter[df_filter['From_CA'] != baa].set_index(['From_CA'])
     df_to = df_filter[df_filter['To_CA'] != baa].set_index(['To_CA'])
     df_graph['To_CA'] = df_to['tx_line_MW']
-    df_graph['From_CA'] = df_from['tx_line_MW']    
+    df_graph['From_CA'] = df_from['tx_line_MW']
+    tx_sil = df_graph['From_CA'].sum()
+
+    df_graph['From_CA_perc'] = df_graph['From_CA'] / tx_sil
+        
 
     fig = go.Figure(data=[
-        go.Bar(name='To_CA', x=df_graph.index , y=df_graph['To_CA']),
-        go.Bar(name='From_CA', x=df_graph.index , y=df_graph['From_CA'])
+        # go.Bar(name='To_CA', x=df_graph.index , y=df_graph['To_CA']),
+        go.Bar(name='From CA', x=df_graph.index , y=df_graph['From_CA_perc'])
     ])
-    fig.update_layout(barmode='group')
-    return fig
+    fig.layout.yaxis.tickformat = ',.0%'  
+    # fig.update_layout(barmode='group')
+    return fig, 'SIL: ' + str(tx_sil)
 
 
 @app.callback(
@@ -480,7 +487,6 @@ def update_tx_graph(baa, period, jsonfile):
     State('store-df', 'children')]
 )
 def update_hhi_graphs(baa, period, n_clicks, playernum, jsonfile):
-    #TODO Update pie chart to group all others not in top10
     if baa == None:
         raise PreventUpdate
     dict_df = json.loads(jsonfile)
