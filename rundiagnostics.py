@@ -31,6 +31,7 @@ lst_periods = ['S_SP1','S_SP2','S_P','S_OP','W_SP','W_P','W_OP','H_SP','H_P','H_
 writer = pd.ExcelWriter(output, engine='xlsxwriter')
 
 
+
 def mm_summary():
     df_map_mm = pd.read_excel(file_mm, sheet_name=None)
     df_map_mm.keys()
@@ -70,7 +71,13 @@ def mm_summary():
     df_tx_out = df_tx_out.groupby(['From_CA', 'To_CA', 'PERIOD'])['tx_line_MW'].sum().reset_index().round(0)
 
     # wheeling
-    df_wheel_out = df_wheel.drop(['From_CA'], axis=1).groupby(['To_CA', 'Period']).mean().reset_index()
+    df_wheel['Unique'] = df_wheel['From_CA'] + df_wheel['To_CA']
+    df_wheel_on = df_wheel[(df_wheel['Period'] == 'S_SP1')].set_index('Unique')
+    df_wheel_off = df_wheel[(df_wheel['Period'] == 'S_OP')].set_index('Unique')
+
+    df_wheel_out = df_wheel_on.rename(columns={'wheel' : 'On-Peak'})
+    df_wheel_out['Off-Peak'] = df_wheel_off['wheel']
+    df_wheel_out = df_wheel_out[['From_CA', 'To_CA', 'On-Peak', 'Off-Peak']]
 
     # export to excel
     df_BAA.to_excel(writer, index=False, sheet_name ='baa')
@@ -131,15 +138,40 @@ def supply_curve():
 
 
 #supply curve tests
-df_supply = pd.read_excel(file_x, sheet_name='DPT_supply_curve')
-df_supply.rename(columns={'Prime mover' : 'Type', 'Marginal cost' : 'MC', 'Capacity (MW)' :'Capacity'}, inplace=True)
-df_supply = df_supply[['Period', 'BAA', 'Generator', 'Owner', 'Type', 'MC', 'Capacity']]
-df_supply['MC'] = df_supply['MC'].round(2)
-df_supply['Capacity'] = df_supply['Capacity'].round(0)
-print('supply curve complete')
-df_load = pd.read_excel(file_mm, sheet_name='loads')
+# df_supply = pd.read_excel(file_x, sheet_name='DPT_supply_curve')
+# df_supply.rename(columns={'Prime mover' : 'Type', 'Marginal cost' : 'MC', 'Capacity (MW)' :'Capacity'}, inplace=True)
+# df_supply = df_supply[['Period', 'BAA', 'Generator', 'Owner', 'Type', 'MC', 'Capacity']]
+# df_supply['MC'] = df_supply['MC'].round(2)
+# df_supply['Capacity'] = df_supply['Capacity'].round(0)
+# print('supply curve complete')
+# df_load = pd.read_excel(file_mm, sheet_name='loads')
 
+# df_wheel = pd.read_excel(file_mm, sheet_name='line_wheel')
+# # df_wheel['Unique'] = df_wheel['From_CA'] + df_wheel['To_CA']
+# # df_wheel_on = df_wheel[(df_wheel['Period'] == 'S_SP1')].set_index('Unique')
+# # df_wheel_off = df_wheel[(df_wheel['Period'] == 'S_OP')].set_index('Unique')
 
+# # df_wheel_out = df_wheel_on.rename({'Line_Wheel' : 'On-Peak'})
+# # df_wheel_out['Off-Peak'] = df_wheel_off['Line_Wheel']
+
+# # def f(row):
+# #     if row['Period'] == 'S_SP1':
+# #         val = 'On-Peak'
+# #     else:
+# #         val = 'Off-Peak'
+# #     return val
+
+# # df_wheel_out['Peak'] = df_wheel_out.apply(f, axis=1)
+
+# # df_wheel_out
+
+# df_wheel['Unique'] = df_wheel['From_CA'] + df_wheel['To_CA']
+# df_wheel_on = df_wheel[(df_wheel['Period'] == 'S_SP1')].set_index('Unique')
+# df_wheel_off = df_wheel[(df_wheel['Period'] == 'S_OP')].set_index('Unique')
+
+# df_wheel_out = df_wheel_on.rename(columns={'Line_Wheel' : 'On-Peak'})
+# df_wheel_out['Off-Peak'] = df_wheel_off['Line_Wheel']
+# df_wheel_out = df_wheel_out[['From_CA', 'To_CA', 'On-Peak', 'Off-Peak']]
 
 mm_summary()
 top_players()

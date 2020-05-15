@@ -96,7 +96,7 @@ LEFT_COLUMN = dbc.Jumbotron(
                         ),
                         dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
                         html.Div(style = {'marginBottom':25}),
-                        html.Label('Select BAA', className='lead'),
+                        html.Label('Select Destination Market', className='lead'),
                         dcc.Dropdown(
                             id ='baa-drop', clearable = False, style={'marginBottom': 25}, disabled = True
                         ),
@@ -110,7 +110,7 @@ LEFT_COLUMN = dbc.Jumbotron(
             ]
 
         )
-    ],fluid = True
+    ],fluid = True#, style={'height':'100%'}
 )
 
 
@@ -145,7 +145,7 @@ DPTSUMMARY_PLOT = [
                                                                     ]
                                                                 ), width=2
                                                             ),
-                                                        ]
+                                                        ], style={'marginTop': 10}
                                                     ),
                                                     dbc.Row(
                                                         dbc.Col(children=[dcc.Graph(id='gen-graph')], width=12)
@@ -171,7 +171,7 @@ DPTSUMMARY_PLOT = [
                                             dcc.Loading(
                                                 id ='loading-transmission',
                                                 children = [
-                                                    dbc.Row(dbc.Col(html.P('SIL:', id='sil'))),
+                                                    dbc.Row(dbc.Col(html.P('SIL:', id='sil')), style={'marginTop': 10}),
                                                     dbc.Row(dbc.Col(dcc.Graph(id='tx-graph'), width=12)),
                                                     
                                                     ],
@@ -180,7 +180,26 @@ DPTSUMMARY_PLOT = [
                                         ],
                                     ),
                                     dcc.Tab(
-                                        label='MCP and Wheeling Rates'
+                                        label='MCP and Wheeling Rates',
+                                        children=[
+                                            dcc.Loading(
+                                                id='loading-MCP-Wheel',
+                                                children=[
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(html.H5('MCPs')),
+                                                            dbc.Col(html.H5('Wheeling Rates'))
+                                                        ], style={'marginTop': 10}
+                                                    ),
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(id='mcp-table'),
+                                                            dbc.Col(id='wheeling-table')
+                                                        ]
+                                                    )
+                                                ]
+                                            )
+                                        ]
                                     )
                                 ],
                             )
@@ -393,6 +412,30 @@ def populate_owner_dropdown(baa, period, jsonfile):
     df = df[(df['BAA'] == baa) & (df['Period'] == period)]
     lst_owners = df['Owner'].unique().tolist()
     return lst_owners[0], [{'label':i, 'value':i} for i in lst_owners]
+
+@app.callback(
+    [Output('mcp-table', 'children'),
+    Output('wheeling-table', 'children')],
+    [Input('baa-drop', 'value')],
+    [State('store-df','children'),
+    State('file-drop', 'value')]
+)
+
+def update_mcp_wheeling_tables(baa, jsonfile, excelfilename):
+    dict_df = json.loads(jsonfile)
+    df_mcp = pd.read_json(dict_df['mcp'], orient='split')
+    df_mcp = df_mcp[(df_mcp['CA'] == baa)]
+    df_mcp = df_mcp[['PERIOD', 'MCP']]
+    mcp_table = dbc.Table.from_dataframe(df_mcp, bordered=True, hover=True)
+
+    df_wheel = pd.read_json(dict_df['wheel'], orient='split')
+    df_wheel = df_wheel[df_wheel['To_CA'] == baa]
+    wheel_table = dbc.Table.from_dataframe(df_wheel, bordered=True, hover=True)
+
+    return [mcp_table], [wheel_table]
+
+
+
 
 @app.callback(
     Output('gen-graph', 'figure'),
