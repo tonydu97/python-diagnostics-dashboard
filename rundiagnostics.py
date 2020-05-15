@@ -113,7 +113,7 @@ def top_players():
     df_hhi = df_hhi[['Period', 'DM', 'Utility', 'MW', 'Share', 'HHI']]
     df_hhi = df_hhi[df_hhi['HHI'] != 0]
     df_hhi['MW'] = df_hhi['MW'].round(0)
-    df_hhi['HHI'] = df_hhi['MW'].round(0)
+    df_hhi['HHI'] = df_hhi['HHI'].round(0)
     df_hhi.to_excel(writer, index=False, sheet_name='hhi')
     print('top players complete')
 

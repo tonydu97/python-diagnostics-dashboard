@@ -47,7 +47,6 @@ import plotly.express as px
 
 
 # global vars
-dir_absolute = 'C:/Users/tdu/python/python-diagnostics-dashboard/diagnostics/'
 dirname = os.path.dirname(__file__)
 path_d = os.path.join(dirname, 'diagnostics/')
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
@@ -117,7 +116,7 @@ LEFT_COLUMN = dbc.Jumbotron(
 
 
 MMSUMMARY_PLOT = [
-    dbc.CardHeader(html.H5('Mmfile Summary')),
+    dbc.CardHeader(html.H5('DPT input file summary')),
     dbc.CardBody(
         [
             dbc.Row(
@@ -202,7 +201,7 @@ BOTTOM_PLOTS = [
                                 id='bottom-tabs',
                                 children=[
                                     dcc.Tab(
-                                        label='Top Players',
+                                        label='Top Player (HHI by Utility)',
                                         children=[
                                             dcc.Loading(
                                                 id='loading-hhi',
@@ -236,7 +235,7 @@ BOTTOM_PLOTS = [
                                         ],
                                     ),
                                     dcc.Tab(
-                                        label='Supply Curve',
+                                        label='Supply Curve (DPT input file)',
                                         children=[
                                             dcc.Loading(
                                                 id='loading-supply',
@@ -257,7 +256,7 @@ BOTTOM_PLOTS = [
                                         ], 
                                     ),
                                     dcc.Tab(
-                                        label='Phase3X4X',
+                                        label='Phase3X4X (3x - Round 1 and 4x',
                                         children=[
                                             dcc.Loading(
                                                 id='loading-phase',
@@ -407,11 +406,28 @@ def update_gen_graph(baa, period, n_clicks, jsonfile, num):
         raise PreventUpdate
     dict_df = json.loads(jsonfile)
     df = pd.read_json(dict_df['gen'], orient='split')
-    df_filter = df[df['CA'] == baa][df['PERIOD'] == period].sort_values(by='gen_MW', ascending=True)
-    df_filter = df_filter.tail(num)
-    fig = px.bar(df_filter, y='UTILITY', x='gen_MW', orientation = 'h')
-    #fig.update_layout(height=450)
+    df_gen = df[df['CA'] == baa][df['PERIOD'] == period].sort_values(by='gen_MW', ascending=True)
+    df_gen = df_gen.tail(num).set_index('UTILITY')
+
+    df_load = pd.read_json(dict_df['loads'], orient='split')
+    df_load = df_load[df_load['CA'] == baa][df_load['PERIOD'] == period].set_index('UTILITY')
+
+    df_gen['LOAD'] = df_load['LOAD']
+    df_gen['net_gen'] = df_gen['gen_MW'] - df_gen['LOAD']
+
+    
+
+
+    fig = go.Figure(data=[
+        go.Bar(name='Net Generation', y=df_gen.index , x=df_gen['net_gen'], orientation='h'),
+        go.Bar(name='Generation', y=df_gen.index , x=df_gen['gen_MW'], orientation='h')
+    ])
+    fig.update_layout(barmode='group')
     return fig
+    #fig = px.bar(df_gen, y='UTILITY', x='gen_MW', orientation = 'h')
+
+    #fig.update_layout(height=450)
+    #return fig
 
 @app.callback(
     Output('load-graph', 'figure'),
