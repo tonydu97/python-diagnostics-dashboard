@@ -426,11 +426,18 @@ def update_mcp_wheeling_tables(baa, jsonfile, excelfilename):
     df_mcp = pd.read_json(dict_df['mcp'], orient='split')
     df_mcp = df_mcp[(df_mcp['CA'] == baa)]
     df_mcp = df_mcp[['PERIOD', 'MCP']]
+    if excelfilename.find('plus') != -1:
+        df_mcp['MCP'] *= 1.1
+    if excelfilename.find('minus') != -1:
+        df_mcp['MCP'] *= 0.9
+    df_mcp['MCP'] = df_mcp['MCP'].round(2)
     mcp_table = dbc.Table.from_dataframe(df_mcp, bordered=True, hover=True)
 
     df_wheel = pd.read_json(dict_df['wheel'], orient='split')
     df_wheel = df_wheel[df_wheel['To_CA'] == baa]
     wheel_table = dbc.Table.from_dataframe(df_wheel, bordered=True, hover=True)
+
+
 
     return [mcp_table], [wheel_table]
 
@@ -468,10 +475,7 @@ def update_gen_graph(baa, period, n_clicks, jsonfile, num):
     ])
     fig.update_layout(barmode='group')
     return fig
-    #fig = px.bar(df_gen, y='UTILITY', x='gen_MW', orientation = 'h')
 
-    #fig.update_layout(height=450)
-    #return fig
 
 @app.callback(
     Output('load-graph', 'figure'),
@@ -553,27 +557,6 @@ def update_hhi_graphs(baa, period, n_clicks, playernum, jsonfile):
     fig_pie = px.pie(df_pie, values='Share', names='Utility', title='Top Players - Market Share', hover_data=['MW'])
     return fig_bar, fig_pie
 
-
-# ## OLD Phase Graph OLD ###
-# @app.callback(
-#     Output('phase-graph', 'figure'),
-#     [Input('baa-drop', 'value'),
-#     Input('period-drop', 'value'),
-#     Input('phase-utility-drop', 'value')],
-#     [State('store-df', 'children')]
-# )
-# def update_phase_graph(baa, period, utility, jsonfile):
-#     if utility == None:
-#         raise PreventUpdate
-#     dict_df = json.loads(jsonfile)
-#     df = pd.read_json(dict_df['phase'], orient='split')
-#     df_filter = df[(df['DM'] == baa) & (df['Period'] == period) & (df['Utility'] == utility)]
-#     fig = go.Figure(data=[
-#         go.Bar(name='3X Gen', x=df_filter['CA'] , y=df_filter['3X']),
-#         go.Bar(name='4X Gen', x=df_filter['CA'] , y=df_filter['4X'])
-#     ])
-#     fig.update_layout(barmode='group')
-#     return fig
 
 @app.callback(
     [Output('phase-datatable', 'columns'),
