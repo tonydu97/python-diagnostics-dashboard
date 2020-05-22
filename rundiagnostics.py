@@ -135,44 +135,6 @@ def supply_curve():
     print('supply curve complete')
 
 
-
-
-#supply curve tests
-# df_supply = pd.read_excel(file_x, sheet_name='DPT_supply_curve')
-# df_supply.rename(columns={'Prime mover' : 'Type', 'Marginal cost' : 'MC', 'Capacity (MW)' :'Capacity'}, inplace=True)
-# df_supply = df_supply[['Period', 'BAA', 'Generator', 'Owner', 'Type', 'MC', 'Capacity']]
-# df_supply['MC'] = df_supply['MC'].round(2)
-# df_supply['Capacity'] = df_supply['Capacity'].round(0)
-# print('supply curve complete')
-# df_load = pd.read_excel(file_mm, sheet_name='loads')
-
-# df_wheel = pd.read_excel(file_mm, sheet_name='line_wheel')
-# # df_wheel['Unique'] = df_wheel['From_CA'] + df_wheel['To_CA']
-# # df_wheel_on = df_wheel[(df_wheel['Period'] == 'S_SP1')].set_index('Unique')
-# # df_wheel_off = df_wheel[(df_wheel['Period'] == 'S_OP')].set_index('Unique')
-
-# # df_wheel_out = df_wheel_on.rename({'Line_Wheel' : 'On-Peak'})
-# # df_wheel_out['Off-Peak'] = df_wheel_off['Line_Wheel']
-
-# # def f(row):
-# #     if row['Period'] == 'S_SP1':
-# #         val = 'On-Peak'
-# #     else:
-# #         val = 'Off-Peak'
-# #     return val
-
-# # df_wheel_out['Peak'] = df_wheel_out.apply(f, axis=1)
-
-# # df_wheel_out
-
-# df_wheel['Unique'] = df_wheel['From_CA'] + df_wheel['To_CA']
-# df_wheel_on = df_wheel[(df_wheel['Period'] == 'S_SP1')].set_index('Unique')
-# df_wheel_off = df_wheel[(df_wheel['Period'] == 'S_OP')].set_index('Unique')
-
-# df_wheel_out = df_wheel_on.rename(columns={'Line_Wheel' : 'On-Peak'})
-# df_wheel_out['Off-Peak'] = df_wheel_off['Line_Wheel']
-# df_wheel_out = df_wheel_out[['From_CA', 'To_CA', 'On-Peak', 'Off-Peak']]
-
 mm_summary()
 top_players()
 supply_curve()

@@ -9,16 +9,18 @@ Visualization and Reporting is generated on the fly
 Use 'rundiagnostics.py' to generate input file
 
 
-v1.1 Beta 5/4/20
+v2 Beta 5/ /20
 
 Updates
-- Fix Top Players Pie Chart
-- Changed Phase3x4x graph into datatable
+- Added Net Generation 
+- Transmission updates - % of total and SILs
+- Added MCP and Wheeling Rates Tab
+- Fix Top Players MW vs HHI Bug
+- Added supply curve tail
 
 To-Do
-- Add MCP and Wheeling rate Information to dashboard (already generated in input file)
-- Card/Tab resizing 
-- Add MCP and AEC vs Non-Eco distinction to Supply Curve
+- Fix Card/Tab resizing
+- Refactoring for caching dataframes 
 
 
 '''
@@ -42,8 +44,7 @@ import numpy as np
 import json
 import plotly.graph_objects as go
 import plotly.express as px
-
-
+import dptlib as dpt
 
 
 # global vars
@@ -51,32 +52,34 @@ dirname = os.path.dirname(__file__)
 path_d = os.path.join(dirname, 'diagnostics/')
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
 
+raw_results_dir = 'X:/DC/Project/Energy&Environ/EMacan26602.00-Project Alice/Analysis - Jagali/Results/Raw results'
+lst_runs = [d for d in os.listdir(raw_results_dir) if os.path.isdir(os.path.join(raw_results_dir, d))]
+lst_runs.sort(reverse = True)
+lst_runs.remove('~old')
+
+# downloadable diagnostics
+lst_diagnostics = ['Phase 3X & 4X Processor']
 
 
 
 
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP])
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], suppress_callback_exceptions=True)
 server = app.server  # for Heroku deployment
 
 
 NAVBAR = dbc.Navbar(
-    children=[
-        html.A(
-            dbc.Row(
-                [
-                    dbc.Col(html.Img(src=app.get_asset_url('branding.png'), height='40px')),
-                    dbc.Col(
-                        dbc.NavbarBrand('DPT Diagnostics Dashboard - Beta', className='ml-2')
-                    ),
-                ],
-                align='center',
-                no_gutters=True,
-            ),
+    [
+        html.Img(src=app.get_asset_url('branding.png'), height='40px'),
+        dbc.Nav(
+            [
+                dbc.NavItem(dbc.NavLink('Dashboard', href='/dashboard', id='dashboard-link', active=True)),
+                dbc.NavItem(dbc.NavLink('Diagnostics Library - Generate and Download XLSX', id='download-link', href='/download'))
+            ], navbar=True, style={'marginLeft': '20px'}
         )
+
     ],
-    color='primary',
+    color='dark',
     dark=True,
-    sticky='top',
 )
 
 LEFT_COLUMN = dbc.Jumbotron(
@@ -172,7 +175,7 @@ DPTSUMMARY_PLOT = [
                                             dcc.Loading(
                                                 id ='loading-transmission',
                                                 children = [
-                                                    dbc.Row(dbc.Col(html.P('SIL:', id='sil')), style={'marginTop': 10}),
+                                                    dbc.Row(dbc.Col(html.H5('SIL:', id='sil')), style={'marginTop': 10}),
                                                     dbc.Row(dbc.Col(dcc.Graph(id='tx-graph'), width=12)),
                                                     
                                                     ],
@@ -352,6 +355,60 @@ BODY = dbc.Container(
     className='mt-12', fluid = True
 )
 
+DOWNLOAD = dbc.Container(
+    [
+        dcc.Loading(
+            [
+                dbc.Jumbotron(
+                    [
+                        html.H2('Select Input Folder and Diagnostic'),
+                        html.Div(style = {'marginBottom':'10px'}),
+                        html.Label('Raw Results Folder'),
+                        dcc.Dropdown(id='dl-case-dropdown', options=[{'label':i, 'value':i} for i in lst_runs], clearable=False, style = {'marginBottom': '20px'}),
+                        html.Label('Diagnostic to Generate'),
+                        dcc.Dropdown(id='dl-diagnostic-dropdown', options = [{'label':i, 'value':i} for i in lst_diagnostics], clearable=False, style = {'marginBottom': '20px'}),
+                        html.Label('Output Directory'),
+                        html.Div(style = {'marginBottom':'10px'}),
+                        dcc.Input(value=dirname+'\\output\\', size = '125'),
+                        html.Hr(),
+                        html.H2('Diagnostic-specific Inputs'),
+                        html.Div(id='dl-diagnostic-inputs')
+
+                    ], style={'marginTop': 30}
+                )
+            ]
+        )
+    ]
+)
+
+@app.callback(
+    Output('page-content', 'children'),
+    [Input('url', 'pathname')]
+)
+def display_page(pathname):
+    if pathname in ['/', '/dashboard']:
+        return [NAVBAR, BODY]
+    elif pathname == '/download':
+        return [NAVBAR, DOWNLOAD]
+    return dbc.Jumbotron(
+        [
+            html.H1('404: Not found', className='text-danger'),
+            html.Hr(),
+            html.P(f'The pathname {pathname} is invalid'),
+        ]
+    )
+
+@app.callback(
+    [Output('dashboard-link', 'active'),
+    Output('download-link', 'active')],
+    [Input('url', 'pathname')]
+)
+def update_active_link(pathname):
+    if pathname in ['/', '/dashboard']:
+        return True, False
+    elif pathname == '/download':
+        return False, True
+    return False, False
 
 @app.callback(
     Output('import-btn', 'disabled'),
@@ -646,10 +703,6 @@ def update_supply_tab(baa, period, utility, jsonfile, excelfilename):
 
     return fig, [marginal_table], [eco_table], [uneco_table]
 
-
-
-
-
 @app.callback(
     [Output('phase-datatable', 'columns'),
     Output('phase-datatable', 'data')],
@@ -678,14 +731,45 @@ def update_table_styles(selected_columns):
         'background_color': '#D2F3FF'
     } for i in selected_columns]
 
+### App callbacks for download page
+@app.callback(
+    [Output('dl-diagnostic-inputs', 'children')],
+    [Input('dl-case-dropdown', 'value'),
+    Input('dl-diagnostic-dropdown', 'value')]
+)
+
+def update_diagnostic_input(inputfolder, diagnostic):
+    if (diagnostic == None) | (inputfolder == None):
+        raise PreventUpdate
+    if diagnostic == 'Phase 3X & 4X Processor':
+        INPUT_PHASE_PROCESSOR = html.Div(
+            [
+                html.H5('REQUIRED'),
+                html.Label('Input file'),
+                html.Label('Period'),
+                html.Label('DM'),
+                html.Label('CA'),
+                html.Label('Utility'),
+                html.Label('Unit'),
+                html.Label('Groupby'),
+                html.H5('OPTIONAL')
+            ]
+        )
+        return [INPUT_PHASE_PROCESSOR]
+    return html.H5('Error')
 
 
 
 
+app.title = 'DPT Diagnostics'
+app.layout = html.Div(
+    [
+        dcc.Location(id='url'),
+        html.Div(id='page-content') #, children=[NAVBAR, BODY])
+    ]
+)
 
 
 
-app.title = 'Diagnostics Dashboard'
-app.layout = html.Div(children=[NAVBAR, BODY])
 if __name__ == '__main__':
     app.run_server(host='127.0.0.1', port='8050', debug=True, dev_tools_ui=True)
