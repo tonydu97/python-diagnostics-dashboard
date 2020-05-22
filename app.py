@@ -85,6 +85,7 @@ LEFT_COLUMN = dbc.Jumbotron(
             id = 'loading-inputs',
             children = [
                 html.Div(id='store-df', style={'display' : 'none'}),
+                html.Div(id='store-mcp', style={'display' : 'none'}),
                 dbc.Container(
                     [
                         html.H4(children='Inputs', className='display-5', style = {'fontSize': 36}),
@@ -273,7 +274,20 @@ BOTTOM_PLOTS = [
                                                         children=[
                                                             dbc.Col(dcc.Graph(id='supply-graph'))
                                                         ]
-
+                                                    ),
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(html.H5('Marginal Unit')),
+                                                            dbc.Col(html.H5('Economic Units')),
+                                                            dbc.Col(html.H5('Uneconomic Units'))                                                            
+                                                        ]
+                                                    ),
+                                                    dbc.Row(
+                                                        children=[
+                                                            dbc.Col(id='marginal-table'),
+                                                            dbc.Col(id='eco-table'),
+                                                            dbc.Col(id='uneco-table')
+                                                        ]
                                                     )
                                                 ]
                                             )
@@ -393,7 +407,6 @@ def populate_dropdowns(jsonfile):
         first_baa = lst_baa[0]
         first_period = lst_periods[0]
 
-
         return [{'label':i, 'value':i} for i in lst_baa], [{'label':i, 'value':i} for i in lst_periods], first_baa, first_period
 
 @app.callback(
@@ -416,6 +429,7 @@ def populate_owner_dropdown(baa, period, jsonfile):
 @app.callback(
     [Output('mcp-table', 'children'),
     Output('wheeling-table', 'children')],
+    #Output('store-mcp', 'children')],
     [Input('baa-drop', 'value')],
     [State('store-df','children'),
     State('file-drop', 'value')]
@@ -437,11 +451,7 @@ def update_mcp_wheeling_tables(baa, jsonfile, excelfilename):
     df_wheel = df_wheel[df_wheel['To_CA'] == baa]
     wheel_table = dbc.Table.from_dataframe(df_wheel, bordered=True, hover=True)
 
-
-
-    return [mcp_table], [wheel_table]
-
-
+    return [mcp_table], [wheel_table]#, df_mcp.to_json(date_format='iso', orient='split')
 
 
 @app.callback(
@@ -516,11 +526,9 @@ def update_tx_graph(baa, period, jsonfile):
         
 
     fig = go.Figure(data=[
-        # go.Bar(name='To_CA', x=df_graph.index , y=df_graph['To_CA']),
         go.Bar(name='From CA', x=df_graph.index , y=df_graph['From_CA_perc'])
     ])
     fig.layout.yaxis.tickformat = ',.0%'  
-    # fig.update_layout(barmode='group')
     return fig, 'SIL: ' + str(tx_sil)
 
 
@@ -550,12 +558,96 @@ def update_hhi_graphs(baa, period, n_clicks, playernum, jsonfile):
 
 
     fig_bar = px.bar(df_top, y='Utility', x='HHI', orientation = 'h', title='Top Players - HHI', hover_data=['MW'])
-    #fig_bar.update_layout(height=450)
+
 
     
 
     fig_pie = px.pie(df_pie, values='Share', names='Utility', title='Top Players - Market Share', hover_data=['MW'])
     return fig_bar, fig_pie
+
+
+@app.callback(
+    [Output('supply-graph', 'figure'),
+    Output('marginal-table', 'children'),
+    Output('eco-table', 'children'),
+    Output('uneco-table', 'children')],
+    [Input('baa-drop', 'value'),
+    Input('period-drop', 'value'),
+    Input('supply-owner-drop', 'value')],
+    [State('store-df','children'),
+    State('file-drop', 'value')]
+)
+def update_supply_tab(baa, period, utility, jsonfile, excelfilename):
+    if (utility == None):
+        raise PreventUpdate
+
+    dict_df = json.loads(jsonfile)
+ 
+    df_load = pd.read_json(dict_df['loads'], orient='split')
+    df_load = df_load[(df_load['CA'] == baa) & (df_load['PERIOD'] == period) & (df_load['UTILITY'] == utility)]
+    load_slice = df_load.loc[:,'LOAD']
+    if len(load_slice) == 0:
+        loadreq = 0
+    else:
+        loadreq = float(load_slice)
+
+    df_supply = pd.read_json(dict_df['supply'], orient='split')
+    df_filter = df_supply[(df_supply['BAA'] == baa) & (df_supply['Period'] == period) & (df_supply['Owner'] == utility)].sort_values(by=['MC'])
+    df_filter['MC'] = df_filter['MC'].round(2)
+    df_filter['cum_MW'] = df_filter['Capacity'].cumsum()
+
+    # generate supply curve 
+    fig = px.scatter(df_filter, x='cum_MW', y='MC', color ='Type', hover_name = 'Generator', hover_data=['Capacity'])
+    fig.update_layout(shapes=[
+        dict(
+        type= 'line',
+        yref= 'paper', y0= 0, y1= 1,
+        xref= 'x', x0=loadreq, x1=loadreq
+        )
+    ])
+    
+    df_mcp = pd.read_json(dict_df['mcp'], orient='split')
+    df_mcp = df_mcp[(df_mcp['CA'] == baa) & (df_mcp['PERIOD'] == period)]
+    df_mcp = df_mcp[['PERIOD', 'MCP']]
+    if excelfilename.find('plus') != -1:
+        df_mcp['MCP'] *= 1.1
+    if excelfilename.find('minus') != -1:
+        df_mcp['MCP'] *= 0.9
+    df_mcp['MCP'] = df_mcp['MCP'].round(2)
+
+    mcpval = df_mcp.iat[0, 1]
+    df_filter = df_filter[df_filter['cum_MW'] > loadreq]
+    df_filter = df_filter[['Generator', 'Capacity', 'MC']]
+
+    # marginal unit - first unit where MC > MCP
+    df_eco = df_filter[df_filter['MC'] <= mcpval]
+
+    if len(df_eco) > 1:
+        df_marginal = df_eco.iloc[0:1]
+        marginal_table = dbc.Table.from_dataframe(df_marginal, bordered=True, hover=True)
+        # economic units - units where MC > MCP excluding marginal unit
+        df_eco = df_eco[1:]
+        eco_table = dbc.Table.from_dataframe(df_eco, bordered=True, hover=True)
+    elif len(df_eco) == 1:
+        df_marginal = df_eco[0:1]
+        marginal_table = dbc.Table.from_dataframe(df_marginal, bordered=True, hover=True)
+        eco_table = html.H5('N/A')
+    else:
+        marginal_table = html.H5('N/A')
+        eco_table = html.H5('N/A')
+
+    #uneconomic units - units where MC <= MCP
+    df_uneco = df_filter[df_filter['MC'] > mcpval]
+
+    if len(df_uneco) != 0:
+        uneco_table = dbc.Table.from_dataframe(df_uneco, bordered=True, hover=True)
+    else:
+        uneco_table = html.H5('N/A')
+
+    return fig, [marginal_table], [eco_table], [uneco_table]
+
+
+
 
 
 @app.callback(
@@ -588,40 +680,8 @@ def update_table_styles(selected_columns):
 
 
 
-@app.callback(
-    Output('supply-graph', 'figure'),
-    [Input('baa-drop', 'value'),
-    Input('period-drop', 'value'),
-    Input('supply-owner-drop', 'value')],
-    [State('store-df', 'children')]
-)
 
-def update_supply_graph(baa, period, utility, jsonfile):
-    if utility == None:
-        raise PreventUpdate
-    dict_df = json.loads(jsonfile)
 
-    df_load = pd.read_json(dict_df['loads'], orient='split')
-    df_load = df_load[(df_load['CA'] == baa) & (df_load['PERIOD'] == period) & (df_load['UTILITY'] == utility)]
-    load_slice = df_load.loc[:,'LOAD']
-    if len(load_slice) == 0:
-        loadreq = 0
-    else:
-        loadreq = float(load_slice)
-
-    df = pd.read_json(dict_df['supply'], orient='split')
-    df_filter = df[(df['BAA'] == baa) & (df['Period'] == period) & (df['Owner'] == utility)].sort_values(by=['MC'])
-    df_filter['cum_MW'] = df_filter['Capacity'].cumsum()
-
-    fig = px.scatter(df_filter, x='cum_MW', y='MC', color ='Type', hover_name = 'Generator', hover_data=['Capacity'])
-    fig.update_layout(shapes=[
-        dict(
-        type= 'line',
-        yref= 'paper', y0= 0, y1= 1,
-        xref= 'x', x0=loadreq, x1=loadreq
-        )
-    ])
-    return fig
 
 
 
