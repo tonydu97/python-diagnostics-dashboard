@@ -10,9 +10,6 @@ Dash Bootstrap Components ("conda install -c conda-forge dash-bootstrap-componen
 
 # INSTRUCTIONS
 
-
-
-modify and run 'rundiagnostics.py' code to generate input file
 open Anaconda Powershell
 navigate to code folder directory
 run 'python app.py'
@@ -20,6 +17,24 @@ visit local url generated (should be http://127.0.0.1:8050/)
 
 
 # CHANGELOG
+
+v2 Beta 5/28/20
+
+Updates
+- New diagnostics library page - generate and download diagnostics directly from web app
+    - Currently includes Dashboard Input file and Phase 3X4X Processor
+- Added Net Generation 
+- Transmission updates - % of total and SILs
+- Added MCP and Wheeling Rates Tab
+- Fix Top Players MW vs HHI Bug
+- Added supply curve tail
+
+To-Do
+- Fix Card/Tab resizing
+- Refactoring for caching dataframes 
+
+
+'''
 
 
 v1.1 Beta 5/4/20

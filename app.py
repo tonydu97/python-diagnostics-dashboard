@@ -9,9 +9,11 @@ Visualization and Reporting is generated on the fly
 Use 'rundiagnostics.py' to generate input file
 
 
-v2 Beta 5/ /20
+v2 Beta 5/28/20
 
 Updates
+- New diagnostics library page - generate and download diagnostics directly from web app
+    - Currently includes Dashboard Input file and Phase 3X4X Processor
 - Added Net Generation 
 - Transmission updates - % of total and SILs
 - Added MCP and Wheeling Rates Tab
@@ -49,7 +51,7 @@ import dptlib as dpt
 
 # global vars
 dirname = os.path.dirname(__file__)
-path_d = os.path.join(dirname, 'diagnostics/')
+path_d = os.path.join(dirname, 'output/')
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
 
 raw_results_dir = 'X:/DC/Project/Energy&Environ/EMacan26602.00-Project Alice/Analysis - Jagali/Results/Raw results'
@@ -58,7 +60,7 @@ lst_runs.sort(reverse = True)
 lst_runs.remove('~old')
 
 # downloadable diagnostics
-lst_diagnostics = ['Phase 3X & 4X Processor']
+lst_diagnostics = ['Dashboard Input File','Phase 3X & 4X Processor']
 
 
 
@@ -72,8 +74,8 @@ NAVBAR = dbc.Navbar(
         html.Img(src=app.get_asset_url('branding.png'), height='40px'),
         dbc.Nav(
             [
-                dbc.NavItem(dbc.NavLink('Dashboard', href='/dashboard', id='dashboard-link', active=True)),
-                dbc.NavItem(dbc.NavLink('Diagnostics Library - Generate and Download XLSX', id='download-link', href='/download'))
+                dbc.NavItem(dbc.NavLink('DPT Dashboard', href='/dashboard', id='dashboard-link', active=True)),
+                dbc.NavItem(dbc.NavLink('Diagnostics Library - Generate XLSX', id='download-link', href='/download'))
             ], navbar=True, style={'marginLeft': '20px'}
         )
 
@@ -96,7 +98,7 @@ LEFT_COLUMN = dbc.Jumbotron(
                         html.Label('Select diagnostics file', className='lead'),
                         dcc.Dropdown(
                             id='file-drop', clearable=False, style = {'marginBottom': 10, 'fontSize': 14},
-                            options=[{'label':i, 'value':i} for i in [f for f in os.listdir(path_d) if f.endswith('.xlsx')]]
+                            options=[{'label':i, 'value':i} for i in [f for f in os.listdir(path_d) if f.startswith('d_')]]
                         ),
                         dbc.Button('Import', id = 'import-btn', color = 'primary', className = 'mr-1', n_clicks = 0, disabled = True),
                         html.Div(style = {'marginBottom':25}),
@@ -357,26 +359,21 @@ BODY = dbc.Container(
 
 DOWNLOAD = dbc.Container(
     [
-        dcc.Loading(
+        dbc.Jumbotron(
             [
-                dbc.Jumbotron(
-                    [
-                        html.H2('Select Input Folder and Diagnostic'),
-                        html.Div(style = {'marginBottom':'10px'}),
-                        html.Label('Raw Results Folder'),
-                        dcc.Dropdown(id='dl-case-dropdown', options=[{'label':i, 'value':i} for i in lst_runs], clearable=False, style = {'marginBottom': '20px'}),
-                        html.Label('Diagnostic to Generate'),
-                        dcc.Dropdown(id='dl-diagnostic-dropdown', options = [{'label':i, 'value':i} for i in lst_diagnostics], clearable=False, style = {'marginBottom': '20px'}),
-                        html.Label('Output Directory'),
-                        html.Div(style = {'marginBottom':'10px'}),
-                        dcc.Input(value=dirname+'\\output\\', size = '125'),
-                        html.Hr(),
-                        html.H2('Diagnostic-specific Inputs'),
-                        html.Div(id='dl-diagnostic-inputs')
-
-                    ], style={'marginTop': 30}
-                )
-            ]
+                html.H2('Select Input Folder and Diagnostic'),
+                html.Div(style = {'marginBottom':'10px'}),
+                html.Label('Raw Results Folder'),
+                dcc.Dropdown(id='dl-case-dropdown', options=[{'label':i, 'value':i} for i in lst_runs], clearable=False, style = {'marginBottom': '20px'}),
+                html.Label('Diagnostic to Generate'),
+                dcc.Dropdown(id='dl-diagnostic-dropdown', options = [{'label':i, 'value':i} for i in lst_diagnostics], clearable=False, style = {'marginBottom': '20px'}),
+                html.Label('Output Directory'),
+                html.Div(style = {'marginBottom':'10px'}),
+                dcc.Input(id='dl-output-textbox', value=dirname+'\\output\\', size = '125'),
+                html.Hr(),
+                html.H2('Diagnostic-specific Inputs'),
+                dcc.Loading(html.Div(id='dl-diagnostic-inputs'))
+            ], style={'marginTop': 30}
         )
     ]
 )
@@ -733,7 +730,7 @@ def update_table_styles(selected_columns):
 
 ### App callbacks for download page
 @app.callback(
-    [Output('dl-diagnostic-inputs', 'children')],
+    Output('dl-diagnostic-inputs', 'children'),
     [Input('dl-case-dropdown', 'value'),
     Input('dl-diagnostic-dropdown', 'value')]
 )
@@ -741,23 +738,116 @@ def update_table_styles(selected_columns):
 def update_diagnostic_input(inputfolder, diagnostic):
     if (diagnostic == None) | (inputfolder == None):
         raise PreventUpdate
-    if diagnostic == 'Phase 3X & 4X Processor':
-        INPUT_PHASE_PROCESSOR = html.Div(
+    if diagnostic == 'Dashboard Input File':
+        DASHBOARD_INPUT_FORM = html.Div(
             [
-                html.H5('REQUIRED'),
-                html.Label('Input file'),
-                html.Label('Period'),
-                html.Label('DM'),
-                html.Label('CA'),
-                html.Label('Utility'),
-                html.Label('Unit'),
-                html.Label('Groupby'),
-                html.H5('OPTIONAL')
+                dbc.Button('Generate Dashboard Input File', id='dl-generatedashboardinput-btn', color='primary', n_clicks=0), 
+                dbc.Toast(
+                    [html.P('File Saved and Exported', className="mb-0")],
+                    id='dl-generatedashboardinput-toast',
+                    header='Done',
+                    is_open=False,
+                    dismissable=True,)
             ]
         )
-        return [INPUT_PHASE_PROCESSOR]
+        return DASHBOARD_INPUT_FORM
+
+    if diagnostic == 'Phase 3X & 4X Processor':
+        # load dropdowns
+        inputfolder = raw_results_dir+ '/' + inputfolder + '/'
+        mmfile = inputfolder + [i for i in os.listdir(inputfolder) if os.path.isfile(os.path.join(inputfolder, i)) and 'mm' in i][0]
+        df_ca = pd.read_excel(mmfile, sheet_name ='CA')
+        df_utilities = pd.read_excel(mmfile, sheet_name='UTILITIES')
+        lst_ca = df_ca['CA'].tolist()
+        lst_utilities = df_utilities['UTILITY'].tolist()
+        INPUT_PHASE_PROCESSOR = dbc.Form(
+            [
+                dbc.FormGroup(
+                    [
+                        dbc.Label('3X or 4X'),
+                        dbc.RadioItems(id='dl-phase-radio', options = [{'label': '3X', 'value' : '3X'}, {'label': '4X', 'value' : '4X'},], value = '4X'),
+                    ]
+                ),
+                dbc.FormGroup(
+                    [
+                        dbc.Label('Period'),
+                        dcc.Dropdown(id='dl-period-dropdown', placeholder='Required', options = [{'label':i, 'value':i} for i in lst_periods]),
+                    ]
+                ),
+                dbc.FormGroup(
+                    [
+                        dbc.Label('DM'),
+                        dcc.Dropdown(id='dl-dm-dropdown', placeholder='Required', options = [{'label':i, 'value':i} for i in lst_ca]),
+                    ]
+                ),
+                dbc.FormGroup(
+                    [
+                        dbc.Label('CA'),
+                        dcc.Dropdown(id='dl-ca-dropdown', placeholder='Optional', options = [{'label':i, 'value':i} for i in lst_ca]),
+                    ]
+                ),
+                dbc.FormGroup(
+                    [
+                        dbc.Label('Utility'),
+                        dcc.Dropdown(id='dl-utility-dropdown', placeholder='Optional', options = [{'label':i, 'value':i} for i in lst_utilities]),
+                    ]
+                ),
+                dbc.Button('Process Phase 3X4X', id = 'dl-generatephase-btn', color = 'primary', className = 'mr-1', n_clicks = 0),
+                dbc.Toast(
+                    [html.P('File Saved and Exported', className="mb-0")],
+                    id='dl-processphase-toast',
+                    header='Done',
+                    is_open=False,
+                    dismissable=True,
+                ),
+            ]
+        )
+        return INPUT_PHASE_PROCESSOR
     return html.H5('Error')
 
+@app.callback(
+    Output('dl-processphase-toast', 'is_open'),
+    [Input('dl-generatephase-btn', 'n_clicks')],
+    [State('dl-case-dropdown', 'value'),
+    State('dl-output-textbox', 'value'),
+    State('dl-phase-radio', 'value'),
+    State('dl-period-dropdown', 'value'),
+    State('dl-dm-dropdown', 'value'),
+    State('dl-ca-dropdown', 'value'),
+    State('dl-utility-dropdown', 'value')]
+)    
+def generate_process_phase3x4x(n_clicks, case, outputfolder, phase, period, dm, ca, utility):
+    if n_clicks == 0:
+        raise PreventUpdate
+    lst_period = [period]
+    lst_dm = [dm]
+    if ca == None:
+        lst_ca = []
+    else:
+        lst_ca = [ca]
+    if utility == None:
+        lst_utility = []
+    else:
+        lst_utility = [utility]
+
+    inputfolder = raw_results_dir+ '/' + case + '/'
+    inputfile = inputfolder + [i for i in os.listdir(inputfolder) if os.path.isfile(os.path.join(inputfolder, i)) and phase in i][0]
+    outputfile = outputfolder + phase + '_processed_' + case + '.xlsx'
+    dpt.process_phase3x4x(inputfile, outputfile, lst_period, lst_dm, lst_ca, lst_utility)
+    return True
+
+@app.callback(
+    Output('dl-generatedashboardinput-toast', 'is_open'),
+    [Input('dl-generatedashboardinput-btn', 'n_clicks')],
+    [State('dl-case-dropdown', 'value'),
+    State('dl-output-textbox', 'value'),]
+)
+
+def generate_dashboardinput(n_clicks, case, outputfolder):
+    if n_clicks == 0:
+        raise PreventUpdate
+    dpt.dashboard_input(raw_results_dir, case, outputfolder)
+    return True
 
 
 
