@@ -18,6 +18,15 @@ visit local url generated (should be http://127.0.0.1:8050/)
 
 # CHANGELOG
 
+v3 Beta 6/8/20
+
+Updates
+- Show Net GEneration for players without load
+- Wheeling Rates table updates
+- MCP line for Supply Curve
+- Download 3x4x all periods button in phase tab
+
+
 v2 Beta 5/28/20
 
 Updates

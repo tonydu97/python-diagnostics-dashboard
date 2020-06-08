@@ -9,16 +9,13 @@ Visualization and Reporting is generated on the fly
 Use 'rundiagnostics.py' to generate input file
 
 
-v2 Beta 5/28/20
+v3 Beta 6/8/20
 
 Updates
-- New diagnostics library page - generate and download diagnostics directly from web app
-    - Currently includes Dashboard Input file and Phase 3X4X Processor
-- Added Net Generation 
-- Transmission updates - % of total and SILs
-- Added MCP and Wheeling Rates Tab
-- Fix Top Players MW vs HHI Bug
-- Added supply curve tail
+- Show Net GEneration for players without load
+- Wheeling Rates table updates
+- MCP line for Supply Curve
+- Download 3x4x all periods button in phase tab
 
 To-Do
 - Fix Card/Tab resizing
