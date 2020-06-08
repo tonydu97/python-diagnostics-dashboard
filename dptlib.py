@@ -83,6 +83,39 @@ def process_phase3x4x(inputfile, outputfile, period=[], dm=[], ca=[], utility=[]
     out_df.to_excel(writer,startrow=12,index=False)
     writer.save()
 
+def phase3x4x_bydmbyperiod(inputcase, df, outputfolder, dm_lst, utility_lst, periods_lst):
+    outputfile = outputfolder + '3xand4x_ByUtility_' + inputcase +'.xlsx'
+    writer = pd.ExcelWriter(outputfile, engine='xlsxwriter')
+    workbook = writer.book
+    format_int = workbook.add_format({'num_format': '#,##0'})
+
+    for dm in dm_lst:
+        filter_df = df[df['DM'] == dm]
+        col = 0
+        row = 1
+        for utility in utility_lst:
+            utility_df = filter_df[filter_df['Utility'] == utility]
+            utility_df.Period = utility_df.Period.astype('category')
+            utility_df.Period.cat.set_categories(periods_lst, inplace = True)
+            utility_df.sort_values(['Period'])
+            out_df = utility_df.groupby(['Utility', 'Period', 'CA']).sum()
+            
+            if len(out_df) != 0:
+                out_df.to_excel(writer, sheet_name=dm, startcol=col, startrow=row)
+            else:
+                pd.DataFrame(columns = ['NA']).to_excel(writer, sheet_name=dm, startcol=col, startrow=row)
+            col += 7
+            worksheet = writer.sheets[dm]
+            worksheet.set_column('A:ZZ', 18, format_int)
+    writer.save()
+
+
+
+
+
+
+
+
 def dashboard_input(rawfolder, inputcase, outputfolder):
 
     folder = rawfolder +'/'

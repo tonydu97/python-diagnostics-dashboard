@@ -54,10 +54,14 @@ dirname = os.path.dirname(__file__)
 path_d = os.path.join(dirname, 'output/')
 lst_periods = ['S_SP1', 'S_SP2', 'S_P', 'S_OP', 'W_SP', 'W_P', 'W_OP', 'H_SP', 'H_P', 'H_OP']
 
-raw_results_dir = 'X:/DC/Project/Energy&Environ/EMacan26602.00-Project Alice/Analysis - Jagali/Results/Raw results'
+#raw_results_dir = 'X:/DC/Project/Energy&Environ/EMacan26602.00-Project Alice/Analysis - Jagali/Results/Raw results'
+raw_results_dir = 'C:/Users/tdu/python/Raw results'
 lst_runs = [d for d in os.listdir(raw_results_dir) if os.path.isdir(os.path.join(raw_results_dir, d))]
 lst_runs.sort(reverse = True)
-lst_runs.remove('~old')
+try:
+    lst_runs.remove('~old')
+except:
+    pass
 
 # downloadable diagnostics
 lst_diagnostics = ['Dashboard Input File','Phase 3X & 4X Processor']
@@ -304,7 +308,14 @@ BOTTOM_PLOTS = [
                                             dcc.Loading(
                                                 id='loading-phase',
                                                 children=[
+                                                    dbc.Button('Download for all periods - Requires Imported Diagnostic File', id='phase-modal-btn', color='primary'),
+                                                    dbc.Modal(
+                                                        [
+                                                            dbc.ModalHeader('Generate Phase3X4X by Owner by DM by Period'),
+                                                            dbc.ModalBody(id='phase-modal-body')
+                                                        ], id='phase-modal', size='lg'
 
+                                                    ),
                                                     dbc.Row(
                                                         children=[
                                                             dbc.Col(
@@ -502,10 +513,13 @@ def update_mcp_wheeling_tables(baa, jsonfile, excelfilename):
     mcp_table = dbc.Table.from_dataframe(df_mcp, bordered=True, hover=True)
 
     df_wheel = pd.read_json(dict_df['wheel'], orient='split')
-    df_wheel = df_wheel[df_wheel['To_CA'] == baa]
-    wheel_table = dbc.Table.from_dataframe(df_wheel, bordered=True, hover=True)
-
-    return [mcp_table], [wheel_table]#, df_mcp.to_json(date_format='iso', orient='split')
+    wheel_to = df_wheel[(df_wheel['To_CA'] == baa)]
+    wheel_to = wheel_to[['To_CA', 'On-Peak', 'Off-Peak']].iloc[[0]]
+    wheel_from = df_wheel[(df_wheel['From_CA'] == baa)]
+    wheel_from = wheel_from[['To_CA', 'On-Peak', 'Off-Peak']]
+    wheel_to_table = dbc.Table.from_dataframe(wheel_to, bordered=True, hover=True)
+    wheel_from_table = dbc.Table.from_dataframe(wheel_from, bordered=True, hover=True)
+    return [mcp_table], [html.Div(children=[wheel_to_table, wheel_from_table])]
 
 
 @app.callback(
@@ -528,6 +542,7 @@ def update_gen_graph(baa, period, n_clicks, jsonfile, num):
     df_load = df_load[df_load['CA'] == baa][df_load['PERIOD'] == period].set_index('UTILITY')
 
     df_gen['LOAD'] = df_load['LOAD']
+    df_gen = df_gen.fillna(0)
     df_gen['net_gen'] = df_gen['gen_MW'] - df_gen['LOAD']
 
     
@@ -583,7 +598,7 @@ def update_tx_graph(baa, period, jsonfile):
         go.Bar(name='From CA', x=df_graph.index , y=df_graph['From_CA_perc'])
     ])
     fig.layout.yaxis.tickformat = ',.0%'  
-    return fig, 'SIL: ' + str(tx_sil)
+    return fig, 'SIL (MW): ' + str(tx_sil)
 
 
 @app.callback(
@@ -650,15 +665,6 @@ def update_supply_tab(baa, period, utility, jsonfile, excelfilename):
     df_filter['MC'] = df_filter['MC'].round(2)
     df_filter['cum_MW'] = df_filter['Capacity'].cumsum()
 
-    # generate supply curve 
-    fig = px.scatter(df_filter, x='cum_MW', y='MC', color ='Type', hover_name = 'Generator', hover_data=['Capacity'])
-    fig.update_layout(shapes=[
-        dict(
-        type= 'line',
-        yref= 'paper', y0= 0, y1= 1,
-        xref= 'x', x0=loadreq, x1=loadreq
-        )
-    ])
     
     df_mcp = pd.read_json(dict_df['mcp'], orient='split')
     df_mcp = df_mcp[(df_mcp['CA'] == baa) & (df_mcp['PERIOD'] == period)]
@@ -670,11 +676,11 @@ def update_supply_tab(baa, period, utility, jsonfile, excelfilename):
     df_mcp['MCP'] = df_mcp['MCP'].round(2)
 
     mcpval = df_mcp.iat[0, 1]
-    df_filter = df_filter[df_filter['cum_MW'] > loadreq]
-    df_filter = df_filter[['Generator', 'Capacity', 'MC']]
+    df_loadserved = df_filter[df_filter['cum_MW'] > loadreq]
+    df_loadserved = df_loadserved[['Generator', 'Capacity', 'MC']]
 
     # marginal unit - first unit where MC > MCP
-    df_eco = df_filter[df_filter['MC'] <= mcpval]
+    df_eco = df_loadserved[df_loadserved['MC'] <= mcpval]
 
     if len(df_eco) > 1:
         df_marginal = df_eco.iloc[0:1]
@@ -691,12 +697,32 @@ def update_supply_tab(baa, period, utility, jsonfile, excelfilename):
         eco_table = html.H5('N/A')
 
     #uneconomic units - units where MC <= MCP
-    df_uneco = df_filter[df_filter['MC'] > mcpval]
+    df_uneco = df_loadserved[df_loadserved['MC'] > mcpval]
 
     if len(df_uneco) != 0:
         uneco_table = dbc.Table.from_dataframe(df_uneco, bordered=True, hover=True)
     else:
         uneco_table = html.H5('N/A')
+
+    # generate supply curve 
+    fig = px.scatter(df_filter, x='cum_MW', y='MC', color ='Type', hover_name = 'Generator', hover_data=['Capacity'])
+    fig.update_layout(shapes=[
+        dict(
+        type= 'line',
+        yref= 'paper', y0= 0, y1= 1,
+        xref= 'x', x0=loadreq, x1=loadreq
+        ),
+        dict(
+        type= 'line',
+        y0=mcpval*1.05, y1=mcpval*1.05,
+        x0=0, x1=df_filter['cum_MW'].max()  
+        )
+    ])
+    fig.update_xaxes(rangemode="tozero")
+    fig.update_yaxes(rangemode="tozero")
+    
+
+
 
     return fig, [marginal_table], [eco_table], [uneco_table]
 
@@ -715,6 +741,83 @@ def update_phase_table(baa, period, jsonfile):
     columns = [{"name": i, "id": i, "deletable": True, "selectable": True} for i in df_filter.columns]
     data = df_filter.to_dict('records')
     return columns, data
+
+@app.callback(
+    [Output('phase-modal', 'is_open'),
+    Output('phase-modal-body', 'children')],
+    [Input('phase-modal-btn', 'n_clicks')],
+    [State('phase-modal', 'is_open'),
+    State('baa-drop', 'value'),
+    State('store-df', 'children')]
+)
+
+def open_phase_modal(n_clicks, is_open, currentbaa, jsonfile):
+
+    # Read in options from diagnostics file
+    if jsonfile == None:
+        raise PreventUpdate
+    dict_df = json.loads(jsonfile)
+    df = pd.read_json(dict_df['phase'], orient='split')
+    lst_dm = df['DM'].unique().tolist()
+    lst_utility = df['Utility'].unique().tolist()
+
+    # Generate modal body
+
+    body = html.Div(
+        [
+            html.Label('Utility - can select multiple'),
+            dcc.Dropdown(
+                id='phase-modal-utility-drop', multi=True, style={'marginBottom': 20},
+                options=[{'label':i, 'value':i} for i in lst_utility]),
+            html.Label('DM - can select multiple'),
+            dcc.Dropdown(
+                id='phase-modal-dm-drop', multi=True, style={'marginBottom': 20},
+                value = currentbaa, options=[{'label':i, 'value':i} for i in lst_dm]),
+            dcc.Input(id='phase-modal-textbox', value=dirname+'\\output\\', size = '100', style={'marginBottom': 20}),
+            dbc.Button('Download', id='phase-modal-download-btn', color='primary', n_clicks=0),
+            dbc.Toast(
+                [html.P('File Saved and Exported')],
+                id='phase-modal-toast',
+                header='Done',
+                is_open=False,
+                dismissable=True,)
+        ]
+    )
+
+    # Open/Close Modal and return
+
+    if n_clicks:
+        return not is_open, body
+    return is_open, body
+
+
+@app.callback(
+    Output('phase-modal-toast', 'is_open'),
+    [Input('phase-modal-download-btn', 'n_clicks')],
+    [State('phase-modal-utility-drop', 'value'),
+    State('phase-modal-dm-drop', 'value'),
+    State('phase-modal-textbox', 'value'),
+    State('file-drop', 'value'),
+    State('store-df', 'children')]
+)
+def download_phase_modal(n_clicks, utility_lst, dm_lst, outputfolder, case, jsonfile):
+    # Read in diagnostics file
+    if (jsonfile == None) | (n_clicks == 0):
+        raise PreventUpdate
+    if type(dm_lst) is str:
+        lst_dm = [dm_lst]
+    else:
+        lst_dm = dm_lst
+    if type(utility_lst) is str:
+        lst_utility = [utility_lst]
+    else:
+        lst_utility = utility_lst
+    dict_df = json.loads(jsonfile)
+    df = pd.read_json(dict_df['phase'], orient='split')
+    dpt.phase3x4x_bydmbyperiod(case, df, outputfolder, lst_dm, lst_utility, lst_periods)
+    return True
+
+
 
 @app.callback( #necessary callback in order to filter
     Output('phase-datatable', 'style_data_conditional'),
